@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 import time
 
 
-def enumerate(graph, n_p=3):
+def enumerate(graph, n_p=2):
 	#returns list of the possible subsets that can be chosen
 	#NOTE: This list is O(n^{n_p}), be aware of memory constraints
 	nodes = list(graph.nodes())
@@ -82,31 +82,38 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01):
 
 	#First step is to generate the matrix A
 	v_i_list = list(itertools.product(nodes, cascades))
+	
+	v_i_len = len(v_i_list)
+	pool_len = len(pools)
+	casc_len = len(cascades)
 
-	A_xS = np.array([1 if x in pools[0] else 0 for (x, _) in v_i_list])
+	A_xS = np.array([[1 if x in pools[0] else 0 for (x, _) in v_i_list]])
 
 	#generates the x(S) rows related to the matrix A
 	for i in pools[1:]:
-		row = np.array([1 if x in i else 0 for (x, _) in v_i_list])
+		row = np.array([[1 if x in i else 0 for (x, _) in v_i_list]])
 
-		A_xS = np.concatenate((A_xS, row), axis=0)
+		A_xS = np.vstack((A_xS, row))
 
 	#generates the v(i,d) rows related to the matrix A
 
-	A_vid = np.array([1 if x == v_i_list[0] else 0 for x in v_i_list])
+	A_vid = np.array([[1 if x == v_i_list[0] else 0 for x in v_i_list]])
 	for i in v_i_list[1:]:
-		row = np.array([1 if x == i else 0 for x in v_i_list])
+		row = np.array([[1 if x == i else 0 for x in v_i_list]])
 
-		A_vid = np.concatenate((A_vid, row), axis=0)
+		A_vid = np.vstack((A_vid, row))
 
 	# A total vector, *HAS NOT* been transposed yet
-	A = np.concatenate((A_xs, A_vid), axis=0)
+	A = np.vstack((A_xS, A_vid))
+	print(A.shape)
 
 	#define the vectors c and b as defined in the dual program
 	c_vec = np.array([1] * len(v_i_list))
-	b_vec = np.array([1/len(cascades)] * len(v_i_list) + [lam/len(cascades)] * len(pools))
+	b_vec = np.array([1/casc_len] * v_i_len + [lam/casc_len] * pool_len)
 
-	delta = (1 + epsilon) *  ((1+epsilon)*(len(v_i_list) + len(pools))) ** (-1/epsilon)
+	print(len(b_vec))
+
+	delta = (1 + epsilon) *  ((1+epsilon) * (v_i_len + pool_len)) ** (-1/epsilon)
 
 	y_0 = delta / b_vec
 	y = y_0
@@ -132,8 +139,8 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01):
 		print(f'Current Iteration: {itera}')
 
 	#break up the vector here, the final elements are the pools, the earlier elements are the node/cascade tuples
-	x_s = np.array(y[-len(pools):])
-	z_i_d = np.array(y[:-len(pools)])
+	x_s = np.array(y[-pool_len:])
+	z_i_d = np.array(y[:-pool_len])
 
 	# z = 1 - y, which means y = 1-z
 	return x_s, 1-z_i_d
@@ -156,16 +163,16 @@ if __name__ == "__main__":
 	start_time = time.time()
 	#So this graph is only 75 nodes, 1138 edges
 	print('Here we go!')
-	df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
-	df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
-	G = nx.from_pandas_edgelist(df, 'e1', 'e2')
-	#graph = nx.read_edgelist(INSERT FILE NAME HERE)
+	#df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
+	#df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
+	#G = nx.from_pandas_edgelist(df, 'e1', 'e2')
+	G = nx.read_edgelist('data/test_graph.txt')
 
 	mapping = dict(zip(G.nodes(),range(len(G))))
 	graph = nx.relabel_nodes(G,mapping)
 	
 	set_list = enumerate(graph)
-	cascade_list = cascade_construction(graph, 400, .05)
+	cascade_list = cascade_construction(graph, 20, .05)
 
 	#recall y is the full combined vector, so will need to split this up
 	x_s, y_i_d = approximation(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
