@@ -3,7 +3,6 @@
 
 import networkx as nx
 import sys
-from gurobipy import *
 import math
 import numpy as np
 import time
@@ -20,7 +19,7 @@ from matplotlib import pyplot as plt
 import time
 
 
-def enumerate(graph, n_p=5):
+def enumerate(graph, n_p=3):
 	#returns list of the possible subsets that can be chosen
 	#NOTE: This list is O(n^{n_p}), be aware of memory constraints
 	nodes = list(graph.nodes())
@@ -155,14 +154,18 @@ def lambda_search(current_full_y, prior_lam, len_pools, budget):
 
 if __name__ == "__main__":
 	start_time = time.time()
-	#So this graph is only 75 nodes, 1138 edges.
+	#So this graph is only 75 nodes, 1138 edges
+	print('Here we go!')
 	df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
 	df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
-	graph = nx.from_pandas_edgelist(df, 'e1', 'e2')
+	G = nx.from_pandas_edgelist(df, 'e1', 'e2')
 	#graph = nx.read_edgelist(INSERT FILE NAME HERE)
+
+	mapping = dict(zip(G.nodes(),range(len(G))))
+	graph = nx.relabel_nodes(G,mapping)
 	
 	set_list = enumerate(graph)
-	cascade_list = cascade_construction(graph, 1000, .05)
+	cascade_list = cascade_construction(graph, 400, .05)
 
 	#recall y is the full combined vector, so will need to split this up
 	x_s, y_i_d = approximation(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
