@@ -105,13 +105,11 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01):
 
 	# A total vector, *HAS NOT* been transposed yet
 	A = np.vstack((A_xS, A_vid))
-	print(A.shape)
-
+	print(f'Shape of A: {A.shape}')
 	#define the vectors c and b as defined in the dual program
 	c_vec = np.array([1] * len(v_i_list))
 	b_vec = np.array([1/casc_len] * v_i_len + [lam/casc_len] * pool_len)
 
-	print(len(b_vec))
 
 	delta = (1 + epsilon) *  ((1+epsilon) * (v_i_len + pool_len)) ** (-1/epsilon)
 
@@ -123,10 +121,13 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01):
 
 	while np.dot(b_vec, y) <= 1:
 		# Do the iterations here
-		length_vector = np.sum((A * np.atleast_2d(y).T), axis=1) # don't need to deal with the c vector because they're all 1, so dividing by c remains
+		length_vector = (A.T * np.atleast_2d(y)) # don't need to deal with the c vector because they're all 1, so dividing by c remains
+		print(length_vector.shape)
 
 		alpha_y = np.min(length_vector) ; q = np.argmin(length_vector) ;
-		min_capacity_edge_vec = b_vec * np.squeeze(A[:, q])
+
+		min_capacity_edge_vec = b_vec / A[:, q]
+		#print(min_capacity_edge_vec)
 
 		min_capacity_edge = np.min(min_capacity_edge_vec) ; p = np.argmin(min_capacity_edge) ;
 
