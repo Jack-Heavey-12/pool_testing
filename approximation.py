@@ -135,7 +135,7 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01):
 		primal += b_vec[p] / A[p,q]
 
 		#update of dual (our LP)
-		y = y * ((1 + epsilon) * (b_vec[p] / A[p,q]) / (b_vec / np.squeeze(A[:, q])))
+		y = y * (1 + epsilon * (b_vec[p] / A[p,q]) / (b_vec / np.squeeze(A[:, q])))
 		itera += 1
 		print(f'Current Iteration: {itera}')
 
