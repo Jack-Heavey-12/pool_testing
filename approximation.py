@@ -125,7 +125,7 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01):
 		print(length_vector.shape)
 
 		alpha_y = np.min(length_vector) ; q = np.argmin(length_vector) ;
-
+		print(f'q: {q}, A shape: {A.shape}')
 		min_capacity_edge_vec = b_vec / A[:, q]
 		#print(min_capacity_edge_vec)
 
@@ -164,10 +164,10 @@ if __name__ == "__main__":
 	start_time = time.time()
 	#So this graph is only 75 nodes, 1138 edges
 	print('Here we go!')
-	#df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
-	#df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
-	#G = nx.from_pandas_edgelist(df, 'e1', 'e2')
-	G = nx.read_edgelist('data/test_graph.txt')
+	df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
+	df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
+	G = nx.from_pandas_edgelist(df, 'e1', 'e2')
+	#G = nx.read_edgelist('data/test_graph.txt')
 
 	mapping = dict(zip(G.nodes(),range(len(G))))
 	graph = nx.relabel_nodes(G,mapping)
