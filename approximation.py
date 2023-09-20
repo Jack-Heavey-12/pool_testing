@@ -87,7 +87,7 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	pool_len = len(pools)
 	casc_len = len(cascades)
 
-	A_xS = np.array([[1 if x in pools[0] else tauv for (x, _) in v_i_list]])
+	A_xS = np.array([[1 if x in pools[0] else tau for (x, _) in v_i_list]])
 
 	#generates the x(S) rows related to the matrix A
 	for i in pools[1:]:
