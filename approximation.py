@@ -69,7 +69,7 @@ def cascade_construction(graph, N, p, source_count=1):
 	- epsilon: exogenous value that provides bounds
 '''
 
-def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01):
+def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	#first step is to construct the matrix A
 	# 	- rows should be x(s) variables (pools) then stacked with v(i,s) 
 	# 	- columns are the v(i,s)
@@ -87,19 +87,19 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01):
 	pool_len = len(pools)
 	casc_len = len(cascades)
 
-	A_xS = np.array([[1 if x in pools[0] else 0 for (x, _) in v_i_list]])
+	A_xS = np.array([[1 if x in pools[0] else tauv for (x, _) in v_i_list]])
 
 	#generates the x(S) rows related to the matrix A
 	for i in pools[1:]:
-		row = np.array([[1 if x in i else 0 for (x, _) in v_i_list]])
+		row = np.array([[1 if x in i else tau for (x, _) in v_i_list]])
 
 		A_xS = np.vstack((A_xS, row))
 
 	#generates the v(i,d) rows related to the matrix A
 
-	A_vid = np.array([[1 if x == v_i_list[0] else 0 for x in v_i_list]])
+	A_vid = np.array([[1 if x == v_i_list[0] else tau for x in v_i_list]])
 	for i in v_i_list[1:]:
-		row = np.array([[1 if x == i else 0 for x in v_i_list]])
+		row = np.array([[1 if x == i else tau for x in v_i_list]])
 
 		A_vid = np.vstack((A_vid, row))
 
