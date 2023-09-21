@@ -69,18 +69,7 @@ def cascade_construction(graph, N, p, source_count=1):
 	- epsilon: exogenous value that provides bounds
 '''
 
-def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
-	#first step is to construct the matrix A
-	# 	- rows should be x(s) variables (pools) then stacked with v(i,s) 
-	# 	- columns are the v(i,s)
-	#	- 1 if node s is in the cascade, 0 otherwise
-
-	#TODO
-	# 1) Define delta, epsilon - DONE
-	# 2) Figure out iterating for lambda, should that happen outside of the approximation function?
-	# 3) Define stopping condition (think this is correct, while loop below)
-
-	#First step is to generate the matrix A
+def define_A_matrix(pools, nodes, cascades, epsilon=0.1, tau=1e-10):
 	v_i_list = list(itertools.product(nodes, cascades))
 	
 	v_i_len = len(v_i_list)
@@ -113,6 +102,30 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	print(f'A Matrix Construction Time: {time.time() - approx_time} seconds ---')
 
 	print(f'Shape of A: {A.shape}')
+
+	return A
+
+
+
+
+def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
+	#first step is to construct the matrix A
+	# 	- rows should be x(s) variables (pools) then stacked with v(i,s) 
+	# 	- columns are the v(i,s)
+	#	- 1 if node s is in the cascade, 0 otherwise
+
+	#TODO
+	# 1) Define delta, epsilon - DONE
+	# 2) Figure out iterating for lambda, should that happen outside of the approximation function?
+	# 3) Define stopping condition (think this is correct, while loop below)
+	
+	#First step is to generate the matrix A
+	v_i_list = list(itertools.product(nodes, cascades))
+	
+	v_i_len = len(v_i_list)
+	pool_len = len(pools)
+	casc_len = len(cascades)
+
 	#define the vectors c and b as defined in the dual program
 	c_vec = np.array([1] * len(v_i_list))
 	b_vec = np.array([1/casc_len] * v_i_len + [lam/casc_len] * pool_len)
@@ -183,8 +196,12 @@ if __name__ == "__main__":
 	print(f'Pools enumerated: {time.time() - start_time} seconds ---')
 	cascade_list = cascade_construction(graph, 20, .05)
 
-	#recall y is the full combined vector, so will need to split this up
-	x_s, y_i_d = approximation(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
+	# Doing it this way because A only has to be constructed once and is a major time suck
+	# We have to do the approximation a few times to settle on lambda
+	A = define_A_matrix(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
+	print(f'A Matrix Construction: {time.time() - start_time} seconds ---')
+	x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, epsilon=.1)
+	#x_s, y_i_d = approximation(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
 
 	#x_prime = rounding(x)
 
