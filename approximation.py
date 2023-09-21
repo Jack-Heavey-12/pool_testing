@@ -87,6 +87,9 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	pool_len = len(pools)
 	casc_len = len(cascades)
 
+
+	approx_time = time.time()
+
 	A_xS = np.array([[1 if x in pools[0] else tau for (x, _) in v_i_list]])
 
 	#generates the x(S) rows related to the matrix A
@@ -97,15 +100,17 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 
 	#generates the v(i,d) rows related to the matrix A
 
-	A_vid = np.array([[1 if x == v_i_list[0] else tau for x in v_i_list]])
+	'''A_vid = np.array([[1 if x == v_i_list[0] else tau for x in v_i_list]])
 	for i in v_i_list[1:]:
 		row = np.array([[1 if x == i else tau for x in v_i_list]])
 
-		A_vid = np.vstack((A_vid, row))
+		A_vid = np.vstack((A_vid, row))'''
+	A_vid = np.identity(v_i_len)
+	A_vid[np.where(A_vid==0)] = tau
 
 	# A total vector, *HAS NOT* been transposed yet
 	A = np.vstack((A_xS, A_vid))
-	#print(f'--- {time.time() - start_time} seconds ---')
+	print(f'A Matrix Construction Time: {time.time() - approx_time} seconds ---')
 
 	print(f'Shape of A: {A.shape}')
 	#define the vectors c and b as defined in the dual program
