@@ -19,7 +19,7 @@ from matplotlib import pyplot as plt
 import time
 
 
-def enumerate(graph, n_p=2):
+def enumerate(graph, n_p=3):
 	#returns list of the possible subsets that can be chosen
 	#NOTE: This list is O(n^{n_p}), be aware of memory constraints
 	nodes = list(graph.nodes())
@@ -105,6 +105,8 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 
 	# A total vector, *HAS NOT* been transposed yet
 	A = np.vstack((A_xS, A_vid))
+	#print(f'--- {time.time() - start_time} seconds ---')
+
 	print(f'Shape of A: {A.shape}')
 	#define the vectors c and b as defined in the dual program
 	c_vec = np.array([1] * len(v_i_list))
@@ -121,8 +123,8 @@ def approximation(pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 
 	while np.dot(b_vec, y) <= 1:
 		# Do the iterations here
-		length_vector = (A.T * np.atleast_2d(y)) # don't need to deal with the c vector because they're all 1, so dividing by c remains
-		print(length_vector.shape)
+		length_vector = A.T @ y # (A.T * np.atleast_2d(y)) # This is incorrect - Need to fix this definition
+		print(f'length vector shape: {length_vector.shape}')
 
 		alpha_y = np.min(length_vector) ; q = np.argmin(length_vector) ;
 		print(f'q: {q}, A shape: {A.shape}')
@@ -173,6 +175,7 @@ if __name__ == "__main__":
 	graph = nx.relabel_nodes(G,mapping)
 	
 	set_list = enumerate(graph)
+	print(f'Pools enumerated: {time.time() - start_time} seconds ---')
 	cascade_list = cascade_construction(graph, 20, .05)
 
 	#recall y is the full combined vector, so will need to split this up
@@ -183,7 +186,7 @@ if __name__ == "__main__":
 	#rounded_obj_val = calculate_E_welfare(x_prime, cascade_list)
 
 	print(f'Number of sets chosen: {np.sum(x_s)}')
-	print(f'--- {time.time() - start_time} seconds ---')
+	print(f'Total Run Time: {time.time() - start_time} seconds ---')
 	#print(f'LP Obj Val: {obj_value}, Rounded Obj Val: {rounded_obj_val}, size of x, y: {len(x)}, {len(y)}')
 
 
