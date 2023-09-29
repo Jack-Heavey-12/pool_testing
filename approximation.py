@@ -119,7 +119,13 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	# 2) Figure out iterating for lambda, should that happen outside of the approximation function?
 	# 3) Define stopping condition (think this is correct, while loop below)
 	
-	#First step is to generate the matrix A
+	# setup the binary search subroutine here
+	lam_array = list(range(1, len(nodes) ** 2 + 1))
+	mid_index = len(lam_array) // 2
+	initial_lam = lam_array[mid_index]
+	down = lam_array[:mid_index-1]
+	up = lam_array[mid_index+1:]
+
 	v_i_list = list(itertools.product(nodes, cascades))
 	
 	v_i_len = len(v_i_list)
@@ -166,18 +172,17 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	# z = 1 - y, which means y = 1-z
 	return x_s, 1-z_i_d
 
-
-
-
-
 # current_full_y is a vector of the both the vector of cleared values and a sum with the pools
 # Recall 1-y = z -> y = z+1
-def lambda_search(current_full_y, prior_lam, len_pools, budget):
-	x_s_vec = current_full_y[-len_pools:]
 
-	new_lam = budget / sum(x_s_vec)
 
-	# TODO
+
+def binary_search(array):
+	mid_index = len(array) // 2
+
+	
+
+
 
 
 if __name__ == "__main__":
@@ -200,7 +205,17 @@ if __name__ == "__main__":
 	# We have to do the approximation a few times to settle on lambda
 	A = define_A_matrix(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
 	print(f'A Matrix Construction: {time.time() - start_time} seconds ---')
+
+
 	x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, epsilon=.1)
+	start_array = list(range(len(graph.nodes()))) ** 2
+	budget = int(np.log(len(graph.nodes())))
+	lambda_search(budget, start_array)
+
+	while not done:
+
+		x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, epsilon=.1)
+
 	#x_s, y_i_d = approximation(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
 
 	#x_prime = rounding(x)
