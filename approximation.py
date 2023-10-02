@@ -177,12 +177,27 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 
 
 
-def binary_search(array):
-	mid_index = len(array) // 2
-
 	
+def acceptable_range(budget, sets_output, lam, error=3):
+	if np.absolute(lam * np.sum(sets_output) - budget) < error:
+		return 0
+	elif lam * np.sum(sets_output) > budget:
+		return -1
+	else:
+		return 1
 
 
+def binary_search(array, sets_output, budget):
+	mid_index = len(array) // 2
+	bool_val = acceptable_range(budget, sets_output, array[mid_index])
+	if bool_val == 0:
+		return True, [], np.nan
+	elif bool_val == -1:
+		return False, array[:mid_index+1:]
+		#return False, array[:mid_index-1]
+	else:
+		return False, array[:mid_index-1]
+		#return False, array[:mid_index+1:]
 
 
 if __name__ == "__main__":
@@ -206,15 +221,27 @@ if __name__ == "__main__":
 	A = define_A_matrix(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
 	print(f'A Matrix Construction: {time.time() - start_time} seconds ---')
 
-
+	done = False
 	x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, epsilon=.1)
-	start_array = list(range(len(graph.nodes()))) ** 2
-	budget = int(np.log(len(graph.nodes())))
-	lambda_search(budget, start_array)
+	start_array = list(range(len(graph.nodes()) ** 2))
+	next_array = start_array
+	budget = 8 #int(np.log(len(graph.nodes())))
+	lam = start_array[len(start_array) // 2]
+
+	it = 0
 
 	while not done:
 
-		x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, epsilon=.1)
+		x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.1)
+		done, next_array = binary_search(next_array, x_s, budget)
+		if not done:
+			mid_index = len(next_array) // 2
+			print(mid_index)
+			lam = next_array[mid_index]
+		if it > 1000:
+			print(it)
+			done = True
+		it += 1
 
 	#x_s, y_i_d = approximation(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
 
