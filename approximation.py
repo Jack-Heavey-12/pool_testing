@@ -28,6 +28,15 @@ def enumerate(graph, n_p=3):
 	print('Potential Pools Enumerated')
 	return set_list
 
+def enumerate_random(graph, n_p, num_sets=1000):
+	#Returns a shorter list of possible subsets for when graphs are larger
+	#TODO
+	nodes = list(graph.nodes())
+	set_list = []
+	for _ in range(num_sets):
+		set_list.append(tuple(random.sample(nodes, n_p)))
+	return set_list
+
 
 def cascade_construction(graph, N, p, source_count=1):
 	# Returns the list of connected components to the source.
@@ -148,10 +157,10 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	while np.dot(b_vec, y) <= 1:
 		# Do the iterations here
 		length_vector = A.T @ y # (A.T * np.atleast_2d(y)) # This is incorrect - Need to fix this definition
-		print(f'length vector shape: {length_vector.shape}')
+		#print(f'length vector shape: {length_vector.shape}')
 
 		alpha_y = np.min(length_vector) ; q = np.argmin(length_vector) ;
-		print(f'q: {q}, A shape: {A.shape}')
+		#print(f'q: {q}, A shape: {A.shape}')
 		min_capacity_edge_vec = b_vec / A[:, q]
 		#print(min_capacity_edge_vec)
 
@@ -163,7 +172,7 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 		#update of dual (our LP)
 		y = y * (1 + epsilon * (b_vec[p] / A[p,q]) / (b_vec / np.squeeze(A[:, q])))
 		itera += 1
-		print(f'Current Iteration: {itera}')
+		#print(f'Current Iteration: {itera}')
 
 	#break up the vector here, the final elements are the pools, the earlier elements are the node/cascade tuples
 	x_s = np.array(y[-pool_len:])
@@ -178,43 +187,71 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 
 
 	
-def acceptable_range(budget, sets_output, lam, error=3):
-	if np.absolute(lam * np.sum(sets_output) - budget) < error:
-		return 0
-	elif lam * np.sum(sets_output) > budget:
-		return -1
+def acceptable_range(budget, sets_output, lam, error=.05):
+	if np.absolute((np.sum(sets_output) - budget)) < budget * error:
+		return 0, lam
+	elif np.sum(sets_output) > budget:
+		return -1, lam
 	else:
-		return 1
+		return 1, lam
 
 
-def binary_search(array, sets_output, budget):
-	mid_index = len(array) // 2
-	bool_val = acceptable_range(budget, sets_output, array[mid_index])
+def binary_search(mini, maxi, sets_output, budget):
+	val = (mini+maxi) / 2
+	bool_val, lam = acceptable_range(budget, sets_output, val)
 	if bool_val == 0:
-		return True, [], np.nan
+		
+		return True, 0, 0
 	elif bool_val == -1:
-		return False, array[:mid_index+1:]
-		#return False, array[:mid_index-1]
-	else:
-		return False, array[:mid_index-1]
 		#return False, array[:mid_index+1:]
+		return False, val, maxi
+	else:
+		#return False, array[:mid_index-1]
+		return False, mini, val
+
+def read_graph(name):
+	if name == 'test_graph':
+		G = nx.read_edgelist('data/test_graph.txt')
+	elif name == 'test_grid':
+		G = nx.read_edgelist('data/test_grid.txt')
+	elif name == 'lyon':
+		df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
+		df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
+		G = nx.from_pandas_edgelist(df, 'e1', 'e2')
+	elif name == 'uva_pre':
+		network = open('data/personnetwork_exp', 'r')
+		lines = network.readlines()
+		lst = []
+		for line in lines:
+			lst.append(line.strip())
+		network.close()
+		H_prime = nx.parse_edgelist(lst[:500])
+		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
+		del lst
+
+	mapping = dict(zip(G.nodes(),range(len(G))))
+	graph = nx.relabel_nodes(G,mapping)
+	return graph
 
 
 if __name__ == "__main__":
 	start_time = time.time()
 	#So this graph is only 75 nodes, 1138 edges
 	print('Here we go!')
-	df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
-	df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
-	G = nx.from_pandas_edgelist(df, 'e1', 'e2')
+	#df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
+	#df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
+	#G = nx.from_pandas_edgelist(df, 'e1', 'e2')
 	#G = nx.read_edgelist('data/test_graph.txt')
+	#G = nx.read_edgelist('data/test_grid.txt')
 
-	mapping = dict(zip(G.nodes(),range(len(G))))
-	graph = nx.relabel_nodes(G,mapping)
+	#mapping = dict(zip(G.nodes(),range(len(G))))
+	graph = read_graph('uva_pre')
 	
-	set_list = enumerate(graph)
+	#set_list = enumerate(graph)
+	set_list = enumerate_random(graph, 5)
+
 	print(f'Pools enumerated: {time.time() - start_time} seconds ---')
-	cascade_list = cascade_construction(graph, 20, .05)
+	cascade_list = cascade_construction(graph, 500, .05)
 
 	# Doing it this way because A only has to be constructed once and is a major time suck
 	# We have to do the approximation a few times to settle on lambda
@@ -223,22 +260,17 @@ if __name__ == "__main__":
 
 	done = False
 	x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, epsilon=.1)
-	start_array = list(range(len(graph.nodes()) ** 2))
-	next_array = start_array
-	budget = 8 #int(np.log(len(graph.nodes())))
-	lam = start_array[len(start_array) // 2]
+	mini = 1/len(graph) ; maxi = len(graph) ** 2
+	budget = 5 #int(np.log(len(graph.nodes())))
 
 	it = 0
 
 	while not done:
-
+		lam = (mini+maxi) / 2
 		x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.1)
-		done, next_array = binary_search(next_array, x_s, budget)
-		if not done:
-			mid_index = len(next_array) // 2
-			print(mid_index)
-			lam = next_array[mid_index]
-		if it > 1000:
+		print(f'Lambda Guess: {lam}, number of sets: {sum(x_s)}')
+		done, mini, maxi = binary_search(mini, maxi, x_s, budget)
+		if it > 5000:
 			print(it)
 			done = True
 		it += 1
