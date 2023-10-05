@@ -86,15 +86,22 @@ def define_A_matrix(pools, nodes, cascades, epsilon=0.1, tau=1e-10):
 	casc_len = len(cascades)
 
 
+	#size of matrix is going to be pool_len + v_i_len rows, v_i_len for columns
+	A = np.zeros((pool_len + v_i_len, v_i_len))
+
 	approx_time = time.time()
 
-	A_xS = np.array([[1 if x in pools[0] else tau for (x, _) in v_i_list]])
+	for i in range(pool_len):
+		A[i, :] = np.array([1 if x in pools[i] else tau for (x, _) in v_i_list])
+
+	
+	#A_xS = np.array([[1 if x in pools[0] else tau for (x, _) in v_i_list]])
 
 	#generates the x(S) rows related to the matrix A
-	for i in pools[1:]:
-		row = np.array([[1 if x in i else tau for (x, _) in v_i_list]])
+	#for i in pools[1:]:
+	#	row = np.array([[1 if x in i else tau for (x, _) in v_i_list]])
 
-		A_xS = np.vstack((A_xS, row))
+	#	A_xS = np.vstack((A_xS, row))
 
 	#generates the v(i,d) rows related to the matrix A
 
@@ -104,10 +111,14 @@ def define_A_matrix(pools, nodes, cascades, epsilon=0.1, tau=1e-10):
 
 		A_vid = np.vstack((A_vid, row))'''
 	A_vid = np.identity(v_i_len)
-	A_vid[np.where(A_vid==0)] = tau
+	inds = A_vid == 0
+	A_vid[inds] = tau
 
+	for i in range(v_i_len):
+		A[i + pool_len] = A_vid[i, :]
+	
 	# A total vector, *HAS NOT* been transposed yet
-	A = np.vstack((A_xS, A_vid))
+	#A_xS = np.vstack((A_xS, A_vid))
 	print(f'A Matrix Construction Time: {time.time() - approx_time} seconds ---')
 
 	print(f'Shape of A: {A.shape}')
@@ -225,7 +236,7 @@ def read_graph(name):
 		for line in lines:
 			lst.append(line.strip())
 		network.close()
-		H_prime = nx.parse_edgelist(lst[:500])
+		H_prime = nx.parse_edgelist(lst[:450])
 		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
 		del lst
 
@@ -251,7 +262,7 @@ if __name__ == "__main__":
 	set_list = enumerate_random(graph, 5)
 
 	print(f'Pools enumerated: {time.time() - start_time} seconds ---')
-	cascade_list = cascade_construction(graph, 500, .05)
+	cascade_list = cascade_construction(graph, 350, .05)
 
 	# Doing it this way because A only has to be constructed once and is a major time suck
 	# We have to do the approximation a few times to settle on lambda
@@ -281,7 +292,7 @@ if __name__ == "__main__":
 
 	#rounded_obj_val = calculate_E_welfare(x_prime, cascade_list)
 
-	print(f'Number of sets chosen: {np.sum(x_s)}')
+	print(f'Number of sets chosen: {np.sum(x_s)}, Expected Welfare: {np.sum(y_i_d) * 1/len(cascade_list)}')
 	print(f'Total Run Time: {time.time() - start_time} seconds ---')
 	#print(f'LP Obj Val: {obj_value}, Rounded Obj Val: {rounded_obj_val}, size of x, y: {len(x)}, {len(y)}')
 
