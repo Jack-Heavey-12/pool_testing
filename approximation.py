@@ -78,7 +78,7 @@ def cascade_construction(graph, N, p, source_count=1):
 	- epsilon: exogenous value that provides bounds
 '''
 
-def define_A_matrix(pools, nodes, cascades, epsilon=0.1, tau=1e-10):
+def define_A_matrix(pools, nodes, cascades, tau=1e-10):
 	v_i_list = list(itertools.product(nodes, cascades))
 	
 	v_i_len = len(v_i_list)
@@ -92,7 +92,8 @@ def define_A_matrix(pools, nodes, cascades, epsilon=0.1, tau=1e-10):
 	approx_time = time.time()
 
 	for i in range(pool_len):
-		A[i, :] = np.array([1 if x in pools[i] else tau for (x, _) in v_i_list])
+		A[i, :] = np.array([1 if (x in pools[i]) and (x not in casc) else tau for (x, casc) in v_i_list])
+		#A[i, :] = np.array([1 if (x in pools[i]) else tau for (x, casc) in v_i_list])
 
 	
 	#A_xS = np.array([[1 if x in pools[0] else tau for (x, _) in v_i_list]])
@@ -154,7 +155,7 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 
 	#define the vectors c and b as defined in the dual program
 	c_vec = np.array([1] * len(v_i_list))
-	b_vec = np.array([1/casc_len] * v_i_len + [lam/casc_len] * pool_len)
+	b_vec = np.array([lam/casc_len] * pool_len + [1/casc_len] * v_i_len)
 
 
 	delta = (1 + epsilon) *  ((1+epsilon) * (v_i_len + pool_len)) ** (-1/epsilon)
@@ -186,11 +187,12 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 		#print(f'Current Iteration: {itera}')
 
 	#break up the vector here, the final elements are the pools, the earlier elements are the node/cascade tuples
-	x_s = np.array(y[-pool_len:])
-	z_i_d = np.array(y[:-pool_len])
+	x_s = np.array(y[:pool_len])
+	z_i_d = np.array(y[-v_i_len:])
 
 	# z = 1 - y, which means y = 1-z
-	return x_s, 1-z_i_d
+	print(f'Objective Value: {np.dot(b_vec, y)}')
+	return x_s, z_i_d
 
 # current_full_y is a vector of the both the vector of cleared values and a sum with the pools
 # Recall 1-y = z -> y = z+1
@@ -198,8 +200,8 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 
 
 	
-def acceptable_range(budget, sets_output, lam, error=.05):
-	if np.absolute((np.sum(sets_output) - budget)) < budget * error:
+def acceptable_range(budget, sets_output, lam, eta=.05):
+	if np.absolute((np.sum(sets_output) - budget)) < budget * eta:
 		return 0, lam
 	elif np.sum(sets_output) > budget:
 		return -1, lam
@@ -229,6 +231,12 @@ def read_graph(name):
 		df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
 		df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
 		G = nx.from_pandas_edgelist(df, 'e1', 'e2')
+	elif name == 'bird':
+		G = nx.read_edgelist('data/aves-wildbird-network.edges')
+	elif name == 'tortoise':
+		G = nx.read_edgelist('data/reptilia-tortoise-network-fi-2011.edges')
+	elif name == 'dolphin':
+		G = nx.read_edgelist('data/mammalia-dolphin-florida-overall.edges')
 	elif name == 'uva_pre':
 		network = open('data/personnetwork_exp', 'r')
 		lines = network.readlines()
@@ -239,6 +247,17 @@ def read_graph(name):
 		H_prime = nx.parse_edgelist(lst[:450])
 		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
 		del lst
+	elif name == 'uva_post':
+		network = open('data/personnetwork_post', 'r')
+		lines = network.readlines()
+		lst = []
+		for line in lines:
+			lst.append(line.strip())
+		network.close()
+		H_prime = nx.parse_edgelist(lst[1000:1500])
+		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
+	elif name == 'random':
+		G = nx.read_edgelist('data/random_150_0.08_12.txt')
 
 	mapping = dict(zip(G.nodes(),range(len(G))))
 	graph = nx.relabel_nodes(G,mapping)
@@ -249,28 +268,22 @@ if __name__ == "__main__":
 	start_time = time.time()
 	#So this graph is only 75 nodes, 1138 edges
 	print('Here we go!')
-	#df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
-	#df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
-	#G = nx.from_pandas_edgelist(df, 'e1', 'e2')
-	#G = nx.read_edgelist('data/test_graph.txt')
-	#G = nx.read_edgelist('data/test_grid.txt')
 
-	#mapping = dict(zip(G.nodes(),range(len(G))))
-	graph = read_graph('uva_pre')
+	graph = read_graph('lyon')
 	
 	#set_list = enumerate(graph)
 	set_list = enumerate_random(graph, 5)
 
 	print(f'Pools enumerated: {time.time() - start_time} seconds ---')
-	cascade_list = cascade_construction(graph, 350, .05)
+	cascade_list = cascade_construction(graph, 250, .1)
 
 	# Doing it this way because A only has to be constructed once and is a major time suck
 	# We have to do the approximation a few times to settle on lambda
-	A = define_A_matrix(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
+	A = define_A_matrix(set_list, list(graph.nodes()), cascade_list)
 	print(f'A Matrix Construction: {time.time() - start_time} seconds ---')
 
 	done = False
-	x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, epsilon=.1)
+	#x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=(mini+maxi)/2, epsilon=.1)
 	mini = 1/len(graph) ; maxi = len(graph) ** 2
 	budget = 5 #int(np.log(len(graph.nodes())))
 
@@ -278,7 +291,7 @@ if __name__ == "__main__":
 
 	while not done:
 		lam = (mini+maxi) / 2
-		x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.1)
+		x_s, z_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.05)
 		print(f'Lambda Guess: {lam}, number of sets: {sum(x_s)}')
 		done, mini, maxi = binary_search(mini, maxi, x_s, budget)
 		if it > 5000:
@@ -291,8 +304,12 @@ if __name__ == "__main__":
 	#x_prime = rounding(x)
 
 	#rounded_obj_val = calculate_E_welfare(x_prime, cascade_list)
-
-	print(f'Number of sets chosen: {np.sum(x_s)}, Expected Welfare: {np.sum(y_i_d) * 1/len(cascade_list)}')
+	# z = 1 - y, which means y = 1-z
+	np.set_printoptions(threshold=sys.maxsize)
+	#print(f'Any OOB? {not all((z_i_d > 0) & (z_i_d < 1))}')
+	print(f'Maximum Value: {max(z_i_d)}')
+	#print(f'Array: {z_i_d}')
+	print(f'Number of sets chosen: {np.sum(x_s)}, Expected Welfare: {np.sum([1 - x for x in z_i_d]) * 1/len(cascade_list)}')
 	print(f'Total Run Time: {time.time() - start_time} seconds ---')
 	#print(f'LP Obj Val: {obj_value}, Rounded Obj Val: {rounded_obj_val}, size of x, y: {len(x)}, {len(y)}')
 
