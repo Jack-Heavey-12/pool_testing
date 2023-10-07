@@ -92,7 +92,7 @@ def define_A_matrix(pools, nodes, cascades, tau=1e-10):
 	approx_time = time.time()
 
 	for i in range(pool_len):
-		A[i, :] = np.array([1 if (x in pools[i]) and (x not in casc) else tau for (x, casc) in v_i_list])
+		A[i, :] = np.array([1 if ((x in pools[i]) and (x not in casc)) else tau for (x, casc) in v_i_list])
 		#A[i, :] = np.array([1 if (x in pools[i]) else tau for (x, casc) in v_i_list])
 
 	
