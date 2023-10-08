@@ -154,7 +154,7 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	casc_len = len(cascades)
 
 	#define the vectors c and b as defined in the dual program
-	c_vec = np.array([1] * len(v_i_list))
+	c_vec = np.array([1 if x not in casc else tau for (x, casc) in cascades]) #[1] * len(v_i_list))
 	b_vec = np.array([lam/casc_len] * pool_len + [1/casc_len] * v_i_len)
 
 
@@ -168,7 +168,7 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 
 	while np.dot(b_vec, y) <= 1:
 		# Do the iterations here
-		length_vector = A.T @ y # (A.T * np.atleast_2d(y)) # This is incorrect - Need to fix this definition
+		length_vector = (A.T @ y) / c_vec # (A.T * np.atleast_2d(y)) # This is incorrect - Need to fix this definition
 		#print(f'length vector shape: {length_vector.shape}')
 
 		alpha_y = np.min(length_vector) ; q = np.argmin(length_vector) ;
@@ -179,7 +179,7 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 		min_capacity_edge = np.min(min_capacity_edge_vec) ; p = np.argmin(min_capacity_edge) ;
 
 		#update of primal LP
-		primal += b_vec[p] / A[p,q]
+		primal += (b_vec[p]*c_vec[p]) / A[p,q]
 
 		#update of dual (our LP)
 		y = y * (1 + epsilon * (b_vec[p] / A[p,q]) / (b_vec / np.squeeze(A[:, q])))
