@@ -40,7 +40,7 @@ def enumerate_random(graph, n_p, num_sets=1000):
 
 def cascade_construction(graph, N, p, source_count=1):
 	# Returns the list of connected components to the source.
-	# NOTE: NOT a nx.Graph() type
+	# NOTE: now a nx.Graph() type since we are using the "compose_all" function
 	cascade_list = []
 
 	#Generates one graph per sample
@@ -63,10 +63,11 @@ def cascade_construction(graph, N, p, source_count=1):
 		ccs = []
 		for source in src:
 			ccs.append(list(nx.node_connected_component(TempGraph, source)))
-		#Quick thing to remove duplicates. Think it should work fine
+		#Quick thing to remove duplicates. Think it should work fine. Is this needed since we then do the compose_all?
 		ccs_f = []
 		[ccs_f.append(x) for x in ccs if x not in ccs_f]
-		cascade_list.append(ccs_f)
+
+		cascade_list.append(nx.compose_all(ccs_f))
 	print('Cascades Generated')
 	return cascade_list
 
@@ -154,7 +155,7 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	casc_len = len(cascades)
 
 	#define the vectors c and b as defined in the dual program
-	c_vec = np.array([1 if x not in casc else tau for (x, casc) in cascades]) #[1] * len(v_i_list))
+	c_vec = np.array([1 if x not in casc else tau for (x, casc) in v_i_list]) #[1] * len(v_i_list))
 	b_vec = np.array([lam/casc_len] * pool_len + [1/casc_len] * v_i_len)
 
 
@@ -209,8 +210,8 @@ def acceptable_range(budget, sets_output, lam, eta=.05):
 		return 1, lam
 
 
-def binary_search(mini, maxi, sets_output, budget):
-	val = (mini+maxi) / 2
+def binary_search(mini, maxi, sets_output, budget, convex_ep=.5):
+	val = mini * convex_ep + maxi * (1 - convex_ep) #(mini+maxi) / 2
 	bool_val, lam = acceptable_range(budget, sets_output, val)
 	if bool_val == 0:
 		
@@ -271,11 +272,11 @@ if __name__ == "__main__":
 
 	graph = read_graph('lyon')
 	
-	#set_list = enumerate(graph)
-	set_list = enumerate_random(graph, 5)
+	set_list = enumerate(graph)
+	#set_list = enumerate_random(graph, 5)
 
 	print(f'Pools enumerated: {time.time() - start_time} seconds ---')
-	cascade_list = cascade_construction(graph, 250, .1)
+	cascade_list = cascade_construction(graph, 750, .1)
 
 	# Doing it this way because A only has to be constructed once and is a major time suck
 	# We have to do the approximation a few times to settle on lambda
@@ -285,7 +286,7 @@ if __name__ == "__main__":
 	done = False
 	#x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=(mini+maxi)/2, epsilon=.1)
 	mini = 1/len(graph) ; maxi = len(graph) ** 2
-	budget = 5 #int(np.log(len(graph.nodes())))
+	budget = 20 #int(np.log(len(graph.nodes())))
 
 	it = 0
 
@@ -293,7 +294,7 @@ if __name__ == "__main__":
 		lam = (mini+maxi) / 2
 		x_s, z_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.05)
 		print(f'Lambda Guess: {lam}, number of sets: {sum(x_s)}')
-		done, mini, maxi = binary_search(mini, maxi, x_s, budget)
+		done, mini, maxi = binary_search(mini, maxi, x_s, budget, convex_ep=.2)
 		if it > 5000:
 			print(it)
 			done = True
