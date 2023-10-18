@@ -79,8 +79,26 @@ def cascade_construction(graph, N, p, source_count=1):
 	- epsilon: exogenous value that provides bounds
 '''
 
-def define_A_matrix(pools, nodes, cascades, tau=1e-10):
+def calc_c_vec(nodes, cascades, tau=1e-10):
 	v_i_list = list(itertools.product(nodes, cascades))
+	
+	v_i_len = len(v_i_list)
+	casc_len = len(cascades)
+
+	#define the vectors c and b as defined in the dual program
+	c_vec = np.array([1 if x not in casc else tau for (x, casc) in v_i_list]) #[1] * len(v_i_list))
+
+	print(f'c_vector original length: {len(c_vec)}')
+	inds = c_vec == 1
+	new_c_vec = c_vec[inds]
+	print(f'new_c_vec length: {len(new_c_vec)}')
+
+	return new_c_vec, inds
+
+
+def define_A_matrix(pools, nodes, cascades, c_ind, tau=1e-10):
+	v_i_list = list(itertools.product(nodes, cascades))
+	v_i_filtered = np.array(v_i_list)[ind]
 	
 	v_i_len = len(v_i_list)
 	pool_len = len(pools)
@@ -89,11 +107,12 @@ def define_A_matrix(pools, nodes, cascades, tau=1e-10):
 
 	#size of matrix is going to be pool_len + v_i_len rows, v_i_len for columns
 	A = np.zeros((pool_len + v_i_len, v_i_len))
+	A = A[:, c_ind]
 
 	approx_time = time.time()
 
 	for i in range(pool_len):
-		A[i, :] = np.array([1 if ((x in pools[i]) and (x not in casc)) else tau for (x, casc) in v_i_list])
+		A[i, :] = np.array([1 if ((x in pools[i]) and (x not in casc)) else tau for (x, casc) in v_i_filtered])
 		#A[i, :] = np.array([1 if (x in pools[i]) else tau for (x, casc) in v_i_list])
 
 	
@@ -115,6 +134,7 @@ def define_A_matrix(pools, nodes, cascades, tau=1e-10):
 	A_vid = np.identity(v_i_len)
 	inds = A_vid == 0
 	A_vid[inds] = tau
+	A_vid = A_vid[:, c_ind]
 
 	for i in range(v_i_len):
 		A[i + pool_len] = A_vid[i, :]
@@ -130,7 +150,7 @@ def define_A_matrix(pools, nodes, cascades, tau=1e-10):
 
 
 
-def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
+def approximation(A, c, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	#first step is to construct the matrix A
 	# 	- rows should be x(s) variables (pools) then stacked with v(i,s) 
 	# 	- columns are the v(i,s)
@@ -140,13 +160,6 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	# 1) Define delta, epsilon - DONE
 	# 2) Figure out iterating for lambda, should that happen outside of the approximation function?
 	# 3) Define stopping condition (think this is correct, while loop below)
-	
-	# setup the binary search subroutine here
-	lam_array = list(range(1, len(nodes) ** 2 + 1))
-	mid_index = len(lam_array) // 2
-	initial_lam = lam_array[mid_index]
-	down = lam_array[:mid_index-1]
-	up = lam_array[mid_index+1:]
 
 	v_i_list = list(itertools.product(nodes, cascades))
 	
@@ -155,7 +168,13 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	casc_len = len(cascades)
 
 	#define the vectors c and b as defined in the dual program
-	c_vec = np.array([1 if x not in casc else tau for (x, casc) in v_i_list]) #[1] * len(v_i_list))
+	c_vec = c
+
+	print(f'c_vector original length: {len(c_vec)}')
+	inds = c_vec == 1
+	new_c_vec = c_vec[inds]
+	print(f'new_c_vec length: {len(new_c_vec)}')
+
 	b_vec = np.array([lam/casc_len] * pool_len + [1/casc_len] * v_i_len)
 
 
@@ -276,11 +295,12 @@ if __name__ == "__main__":
 	#set_list = enumerate_random(graph, 5)
 
 	print(f'Pools enumerated: {time.time() - start_time} seconds ---')
-	cascade_list = cascade_construction(graph, 750, .1)
+	cascade_list = cascade_construction(graph, 100, .1)
 
 	# Doing it this way because A only has to be constructed once and is a major time suck
 	# We have to do the approximation a few times to settle on lambda
-	A = define_A_matrix(set_list, list(graph.nodes()), cascade_list)
+	c_vec, ind = calc_c_vec(list(graph.nodes()), cascade_list)
+	A = define_A_matrix(set_list, list(graph.nodes()), cascade_list, ind)
 	print(f'A Matrix Construction: {time.time() - start_time} seconds ---')
 
 	done = False
@@ -292,7 +312,7 @@ if __name__ == "__main__":
 
 	while not done:
 		lam = (mini+maxi) / 2
-		x_s, z_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.05)
+		x_s, z_i_d = approximation(A, c_vec, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.05)
 		print(f'Lambda Guess: {lam}, number of sets: {sum(x_s)}')
 		done, mini, maxi = binary_search(mini, maxi, x_s, budget, convex_ep=.2)
 		if it > 5000:
