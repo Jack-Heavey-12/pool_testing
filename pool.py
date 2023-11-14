@@ -10,13 +10,15 @@ import pandas as pd
 import json
 import random
 
+import pickle
+
 
 from collections import defaultdict
 import itertools
 
 from matplotlib import pyplot as plt
 
-def enumerate(graph, n_p=5):
+def enumerate(graph, n_p=3):
 	#returns list of the possible subsets that can be chosen
 	#NOTE: This list is O(n^{n_p}), be aware of memory constraints
 	nodes = list(graph.nodes())
@@ -65,7 +67,7 @@ def cascade_construction(graph, N, p, source_count=1):
 	- B: int
 	- overlapping: bool (defines whether overlapping sets are allowed or not, affects constraint 1)
 '''
-def LinearProgram(graph, set_list, cascades, B, overlapping=True):
+def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 
 	x = {} # defined in the paper
 	y = {} # defined in the paper
@@ -86,7 +88,7 @@ def LinearProgram(graph, set_list, cascades, B, overlapping=True):
 
 	# Constraint 1
 	#If we are doing overlapping sets
-	if overlapping:
+	'''if overlapping:
 		for i in range(len(cascades)):
 			for v in node_list:
 				#print(cascades[i])
@@ -104,7 +106,15 @@ def LinearProgram(graph, set_list, cascades, B, overlapping=True):
 					# The node is not in the connected component, any set with this node in it is valid:
 					F_vi = [S for S in set_list if v in S]
 					m.addConstr(y[f'({v}, {i})'] == quicksum(x[S] for S in F_vi), name=f'C1_Node_{v}_cascade_{i}')
-	#Non-overlapping Constraint
+	#Non-overlapping Constraint'''
+
+	for i in range(len(cascades)):
+			for v in node_list:
+				val =  v in cascades[i] #Boolean for if the node is in the connected conponent from the source
+				if not val:
+					# The node is not in the connected component, any set with this node in it is valid:
+					F_vi = [S for S in set_list if v in S]
+					m.addConstr(y[f'({v}, {i})'] <= quicksum(x[S] for S in F_vi), name=f'C1_Node_{v}_cascade_{i}')
 	#END CONSTRAINT ONE
 
 	m.update()
@@ -117,12 +127,18 @@ def LinearProgram(graph, set_list, cascades, B, overlapping=True):
 
 
 	m.setObjective(1/N * quicksum(y[f'({v}, {i})'] for i in range(N) for v in node_list), GRB.MAXIMIZE)
+	m.setParam('OutputFlag', 1)
 	m.update()
 	m.optimize()
+	print(f'Status Code: {m.Status}')
+
+	print(f'Solution Count: {m.SolCount}')
+
 
 	#RETURNS THE DICTIONARY WITH THE VARIABLES X (FOR ROUNDING LATER), DICTIONARY WITH VARIABLES Y, 
 	#		AND THE OPTIMAL OBJECTIVE VALUE (UPPER BOUND ON ROUNDED ANSWER WITH NO VIOLATED BUDGET)
-	return x, y, m.objVal
+	variables = m.getVars()
+	return x, y, m.objVal, variables
 
 
 def rounding(x_dict):
@@ -132,7 +148,10 @@ def rounding(x_dict):
 	x_prime_dict = {}
 	for S in x.keys():
 		limit = np.random.uniform(0,1)
-		if limit <= x[S].x:
+		#print(type(x[S]))
+		#print(dir(x[S]))
+		#sys.exit()
+		if limit <= x[S].X:
 			x_prime_dict[S] = 1
 	#NOTE: 	This will not have *every* set in this dictionary, only the pools that we are going to end up choosing
 	#		Figure this is easier than trying to check if every value is one or zero, we can jsut compare length for expectation, etc.
@@ -156,18 +175,60 @@ def calculate_E_welfare(x_prime, cascade_list):
 
 	#Cycle through keys in x_prime, see which cascades they are cleared in
 
+def read_graph(name):
+	if name == 'test_graph':
+		G = nx.read_edgelist('data/test_graph.txt')
+	elif name == 'test_grid':
+		G = nx.read_edgelist('data/test_grid.txt')
+	elif name == 'lyon':
+		df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
+		df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
+		G = nx.from_pandas_edgelist(df, 'e1', 'e2')
+	elif name == 'bird':
+		G = nx.read_edgelist('data/aves-wildbird-network.edges')
+	elif name == 'tortoise':
+		G = nx.read_edgelist('data/reptilia-tortoise-network-fi-2011.edges')
+	elif name == 'dolphin':
+		G = nx.read_edgelist('data/mammalia-dolphin-florida-overall.edges')
+	elif name == 'uva_pre':
+		network = open('data/personnetwork_exp', 'r')
+		lines = network.readlines()
+		lst = []
+		for line in lines:
+			lst.append(line.strip())
+		network.close()
+		H_prime = nx.parse_edgelist(lst[:450])
+		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
+		del lst
+	elif name == 'uva_post':
+		network = open('data/personnetwork_post', 'r')
+		lines = network.readlines()
+		lst = []
+		for line in lines:
+			lst.append(line.strip())
+		network.close()
+		H_prime = nx.parse_edgelist(lst[1000:1500])
+		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
+	elif name == 'random':
+		G = nx.read_edgelist('data/random_150_0.08_12.txt')
+
+	mapping = dict(zip(G.nodes(),range(len(G))))
+	graph = nx.relabel_nodes(G,mapping)
+	return graph
+
 if __name__ == "__main__":
 
-	#So this graph is only 75 nodes, 1138 edges.
-	df = pd.read_csv('data/hospital_contacts', sep='\t', header=None)
-	df.columns = ['time', 'e1', 'e2', 'lab_1', 'lab_2']
-	graph = nx.from_pandas_edgelist(df, 'e1', 'e2')
-	#graph = nx.read_edgelist(INSERT FILE NAME HERE)
+	graph = read_graph('test_graph')
 	
 	set_list = enumerate(graph)
-	cascade_list = cascade_construction(graph, 1000, .05)
+	#cascade_list = cascade_construction(graph, 1000, .05)
+	with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
+		cascade_list = pickle.load(f)
 
-	x, y, obj_value = LinearProgram(graph, set_list, cascade_list, 10)
+	x, y, obj_value, variables = LinearProgram(graph, set_list, cascade_list, 3)
+	print(f'Objeective Value: {obj_value}')
+	print(f'Variables: {variables}')
+
 
 	x_prime = rounding(x)
 

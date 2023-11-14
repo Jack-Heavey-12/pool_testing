@@ -27,6 +27,27 @@ def enumerate(graph, n_p=3):
 		set_list += list(itertools.combinations(nodes, i))
 	return set_list
 
+def acceptable_range(budget, sets_output, lam, eta=.05):
+	if np.absolute((np.sum(sets_output) - budget)) < budget * eta:
+		return 0, lam
+	elif np.sum(sets_output) > budget:
+		return -1, lam
+	else:
+		return 1, lam
+
+def binary_search(mini, maxi, x_dict, budget, convex_ep=.5):
+	val = mini * convex_ep + maxi * (1 - convex_ep) #(mini+maxi) / 2
+	sets_output = sum([x_dict[i].X for i in list(x_dict.keys())])
+	bool_val, lam = acceptable_range(budget, sets_output, val)
+	if bool_val == 0:	
+		return True, 0, 0
+	elif bool_val == -1:
+		#return False, array[:mid_index+1:]
+		return False, val, maxi
+	else:
+		#return False, array[:mid_index-1]
+		return False, mini, val
+
 def cascade_construction(graph, N, p, source_count=1):
 	# Returns the list of connected components to the source.
 	# NOTE: NOT a nx.Graph() type
@@ -67,10 +88,10 @@ def cascade_construction(graph, N, p, source_count=1):
 	- B: int
 	- overlapping: bool (defines whether overlapping sets are allowed or not, affects constraint 1)
 '''
-def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
+def LinearProgram(graph, set_list, cascades, B=3, lam=1.01, overlapping=True):
 
 	x = {} # defined in the paper
-	y = {} # defined in the paper
+	z = {} # defined in the paper
 
 	N = len(cascades)
 
@@ -82,7 +103,7 @@ def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 	node_list = list(graph.nodes())
 	for i in range(len(cascades)):
 		for v in node_list:
-			y[f'({v}, {i})'] = m.addVar(vtype = GRB.CONTINUOUS, lb = 0.0, ub = 1.0, name = f'y[({v}, {i})]')
+			z[f'({v}, {i})'] = m.addVar(vtype = GRB.CONTINUOUS, lb = 0.0, ub = 1.0, name = f'z[({v}, {i})]')
 
 	m.update()
 
@@ -114,19 +135,19 @@ def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 				if not val:
 					# The node is not in the connected component, any set with this node in it is valid:
 					F_vi = [S for S in set_list if v in S]
-					m.addConstr(y[f'({v}, {i})'] <= quicksum(x[S] for S in F_vi), name=f'C1_Node_{v}_cascade_{i}')
+					m.addConstr(z[f'({v}, {i})'] + quicksum(x[S] for S in F_vi) >= 1, name=f'C1_Node_{v}_cascade_{i}')
 	#END CONSTRAINT ONE
 
 	m.update()
 	
 
 	# Constraint 2 - need results to be under the budget
-	m.addConstr(quicksum(x[S] for S in set_list) <= B, name='C2_Budget Constraint')
+	#m.addConstr(quicksum(x[S] for S in set_list) <= B, name='C2_Budget Constraint')
 
 	m.update()
 
 
-	m.setObjective(1/N * quicksum(y[f'({v}, {i})'] for i in range(N) for v in node_list), GRB.MAXIMIZE)
+	m.setObjective(1/N * quicksum(z[f'({v}, {i})'] for i in range(N) for v in node_list) + lam/N * quicksum(x[S] for S in set_list), GRB.MINIMIZE)
 	m.setParam('OutputFlag', 1)
 	m.update()
 	m.optimize()
@@ -138,7 +159,7 @@ def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 	#RETURNS THE DICTIONARY WITH THE VARIABLES X (FOR ROUNDING LATER), DICTIONARY WITH VARIABLES Y, 
 	#		AND THE OPTIMAL OBJECTIVE VALUE (UPPER BOUND ON ROUNDED ANSWER WITH NO VIOLATED BUDGET)
 	variables = m.getVars()
-	return x, y, m.objVal, variables
+	return x, z, m.objVal, variables
 
 
 def rounding(x_dict):
@@ -225,7 +246,24 @@ if __name__ == "__main__":
 	with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
 		cascade_list = pickle.load(f)
 
-	x, y, obj_value, variables = LinearProgram(graph, set_list, cascade_list, 3)
+
+	done = False
+	#x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=(mini+maxi)/2, epsilon=.1)
+	mini = 1/len(graph) ; maxi = len(graph) ** 2
+	budget = 10 #int(np.log(len(graph.nodes())))
+
+	it = 0
+
+	while not done:
+		lam = (mini+maxi) / 2
+		x, z, obj_value, variables = LinearProgram(graph, set_list, cascade_list, 3, lam=lam)
+
+		print(f'Lambda Guess: {lam}, number of sets: {sum([x[key].X for key in list(x.keys())])}')
+		done, mini, maxi = binary_search(mini, maxi, x, budget, convex_ep=.2)
+		if it > 5000:
+			print(it)
+			done = True
+		it += 1
 	print(f'Objeective Value: {obj_value}')
 	print(f'Variables: {variables}')
 
