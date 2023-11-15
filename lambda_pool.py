@@ -22,9 +22,9 @@ def enumerate(graph, n_p=3):
 	#returns list of the possible subsets that can be chosen
 	#NOTE: This list is O(n^{n_p}), be aware of memory constraints
 	nodes = list(graph.nodes())
-	set_list = []
-	for i in range(1, n_p+1):
-		set_list += list(itertools.combinations(nodes, i))
+	#set_list = []
+	set_list = list(itertools.combinations(nodes, n_p))
+	print('Potential Pools Enumerated')
 	return set_list
 
 def acceptable_range(budget, sets_output, lam, eta=.5):

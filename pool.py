@@ -22,10 +22,11 @@ def enumerate(graph, n_p=3):
 	#returns list of the possible subsets that can be chosen
 	#NOTE: This list is O(n^{n_p}), be aware of memory constraints
 	nodes = list(graph.nodes())
-	set_list = []
-	for i in range(1, n_p+1):
-		set_list += list(itertools.combinations(nodes, i))
+	#set_list = []
+	set_list = list(itertools.combinations(nodes, n_p))
+	print('Potential Pools Enumerated')
 	return set_list
+
 
 def cascade_construction(graph, N, p, source_count=1):
 	# Returns the list of connected components to the source.
@@ -157,7 +158,7 @@ def rounding(x_dict):
 		#print(type(x[S]))
 		#print(dir(x[S]))
 		#sys.exit()
-		if limit <= x[S].X:
+		if limit <= x[S]:
 			x_prime_dict[S] = 1
 	#NOTE: 	This will not have *every* set in this dictionary, only the pools that we are going to end up choosing
 	#		Figure this is easier than trying to check if every value is one or zero, we can jsut compare length for expectation, etc.
@@ -175,7 +176,7 @@ def calculate_E_welfare(x_prime, cascade_list):
 		for v in S:
 			for i in cascade_list:
 				#will give a 1 if the node is cleared in that cascade, note we DON'T want it in the connected component
-				val = int(all([False if v in cc else True for cc in i]))
+				val = int(not (v in i))
 				running_clearances += val
 	return running_clearances / num_cascades #The correct objective value I think?
 
@@ -217,6 +218,9 @@ def read_graph(name):
 		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
 	elif name == 'random':
 		G = nx.read_edgelist('data/random_150_0.08_12.txt')
+	elif name == 'path_graph':
+		G = nx.read_edgelist('data/path_graph_4.txt')
+
 
 	mapping = dict(zip(G.nodes(),range(len(G))))
 	graph = nx.relabel_nodes(G,mapping)
@@ -224,22 +228,31 @@ def read_graph(name):
 
 if __name__ == "__main__":
 
-	graph = read_graph('test_graph')
+	graph = read_graph('path_graph')
 	
-	set_list = enumerate(graph)
+	set_list = enumerate(graph, n_p=2)
 	#cascade_list = cascade_construction(graph, 1000, .05)
 
-	budget = 3
+	budget = 2
 
-	with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
+	#with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
+	with open('test_cascades/path_graph_4n_5c.pkl', 'rb') as f:
 		cascade_list = pickle.load(f)
 
 	x, y, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget)
 	print(f'Objeective Value: {obj_value}')
-	print(f'Variables: {variables}')
+	#print(f'Variables: {variables}')
 
 
 	x_prime = rounding(x)
+	nonzeros = {}
+	for i in x.keys():
+		if x[i] > 0:
+			nonzeros[i] = x[i]
+	print(f'Cascades: {cascade_list}\n\n')
+	print(f'LP Output: {nonzeros}, Ys: {y}')
+	print(f'Sets Chosen: {x_prime}')
+
 
 	rounded_obj_val = calculate_E_welfare(x_prime, cascade_list)
 
