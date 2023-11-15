@@ -146,8 +146,14 @@ def LinearProgram(graph, set_list, cascades, B=3, lam=1.01, overlapping=True):
 
 	m.update()
 
+	possible_cleared_nodes = []
+	for i in range(len(cascades)):
+		for v in node_list:
+			val =  v in cascades[i]
+			if not val:
+				possible_cleared_nodes.append((v,i))
 
-	m.setObjective(1/N * quicksum(z[f'({v}, {i})'] for i in range(N) for v in node_list) + lam/N * quicksum(x[S] for S in set_list), GRB.MINIMIZE)
+	m.setObjective(1/N * quicksum(z[f'({v}, {i})'] for (v,i) in possible_cleared_nodes) + lam/N * quicksum(x[S] for S in set_list), GRB.MINIMIZE)
 	m.setParam('OutputFlag', 1)
 	m.update()
 	m.optimize()
@@ -266,7 +272,7 @@ if __name__ == "__main__":
 		x, z, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget, lam=lam)
 
 		print(f'Lambda Guess: {lam}')
-		print(f'X Dict: {x}')
+		#print(f'X Dict: {x}')
 		done, mini, maxi = binary_search(mini, maxi, x, budget, convex_ep=.2)
 		if it > 5000:
 			print(it)

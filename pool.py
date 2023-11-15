@@ -126,8 +126,14 @@ def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 
 	m.update()
 
+	possible_cleared_nodes = []
+	for i in range(len(cascades)):
+		for v in node_list:
+			val =  v in cascades[i]
+			if not val:
+				possible_cleared_nodes.append((v,i))
 
-	m.setObjective(1/N * quicksum(y[f'({v}, {i})'] for i in range(N) for v in node_list), GRB.MAXIMIZE)
+	m.setObjective(1/N * quicksum(y[f'({v}, {i})'] for (v,i) in possible_cleared_nodes), GRB.MAXIMIZE)
 	m.setParam('OutputFlag', 1)
 	m.update()
 	m.optimize()
@@ -228,15 +234,15 @@ def read_graph(name):
 
 if __name__ == "__main__":
 
-	graph = read_graph('path_graph')
+	graph = read_graph('test_graph')
 	
-	set_list = enumerate(graph, n_p=2)
+	set_list = enumerate(graph, n_p=3)
 	#cascade_list = cascade_construction(graph, 1000, .05)
 
-	budget = 2
+	budget = 3
 
-	#with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
-	with open('test_cascades/path_graph_4n_5c.pkl', 'rb') as f:
+	with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
+	#with open('test_cascades/path_graph_4n_5c.pkl', 'rb') as f:
 		cascade_list = pickle.load(f)
 
 	x, y, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget)
@@ -249,8 +255,8 @@ if __name__ == "__main__":
 	for i in x.keys():
 		if x[i] > 0:
 			nonzeros[i] = x[i]
-	print(f'Cascades: {cascade_list}\n\n')
-	print(f'LP Output: {nonzeros}, Ys: {y}')
+	#print(f'Cascades: {cascade_list}\n\n')
+	#print(f'LP Output: {nonzeros}, Ys: {y}')
 	print(f'Sets Chosen: {x_prime}')
 
 
