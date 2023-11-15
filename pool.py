@@ -133,12 +133,18 @@ def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 	print(f'Status Code: {m.Status}')
 
 	print(f'Solution Count: {m.SolCount}')
+	x_vals = {}
+	y_vals = {}
+	for i in x.keys():
+		x_vals[i] = x[i].X
+	for i in y.keys():
+		y_vals[i] = y[i].X
 
 
 	#RETURNS THE DICTIONARY WITH THE VARIABLES X (FOR ROUNDING LATER), DICTIONARY WITH VARIABLES Y, 
 	#		AND THE OPTIMAL OBJECTIVE VALUE (UPPER BOUND ON ROUNDED ANSWER WITH NO VIOLATED BUDGET)
 	variables = m.getVars()
-	return x, y, m.objVal, variables
+	return x_vals, y_vals, m.objVal, variables
 
 
 def rounding(x_dict):
@@ -222,10 +228,13 @@ if __name__ == "__main__":
 	
 	set_list = enumerate(graph)
 	#cascade_list = cascade_construction(graph, 1000, .05)
+
+	budget = 3
+
 	with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
 		cascade_list = pickle.load(f)
 
-	x, y, obj_value, variables = LinearProgram(graph, set_list, cascade_list, 3)
+	x, y, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget)
 	print(f'Objeective Value: {obj_value}')
 	print(f'Variables: {variables}')
 

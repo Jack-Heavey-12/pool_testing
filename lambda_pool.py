@@ -27,8 +27,8 @@ def enumerate(graph, n_p=3):
 		set_list += list(itertools.combinations(nodes, i))
 	return set_list
 
-def acceptable_range(budget, sets_output, lam, eta=.05):
-	if np.absolute((np.sum(sets_output) - budget)) < budget * eta:
+def acceptable_range(budget, sets_output, lam, eta=.5):
+	if np.absolute((np.sum(sets_output) - budget)) < eta: #budget * eta:
 		return 0, lam
 	elif np.sum(sets_output) > budget:
 		return -1, lam
@@ -135,7 +135,7 @@ def LinearProgram(graph, set_list, cascades, B=3, lam=1.01, overlapping=True):
 				if not val:
 					# The node is not in the connected component, any set with this node in it is valid:
 					F_vi = [S for S in set_list if v in S]
-					m.addConstr(z[f'({v}, {i})'] + quicksum(x[S] for S in F_vi) >= 1, name=f'C1_Node_{v}_cascade_{i}')
+					m.addConstr(quicksum(x[S] for S in F_vi) + z[f'({v}, {i})'] >= 1, name=f'C1_Node_{v}_cascade_{i}')
 	#END CONSTRAINT ONE
 
 	m.update()
@@ -179,7 +179,7 @@ def rounding(x_dict):
 		#print(type(x[S]))
 		#print(dir(x[S]))
 		#sys.exit()
-		if limit <= x[S].X:
+		if limit <= x[S]:
 			x_prime_dict[S] = 1
 	#NOTE: 	This will not have *every* set in this dictionary, only the pools that we are going to end up choosing
 	#		Figure this is easier than trying to check if every value is one or zero, we can jsut compare length for expectation, etc.
@@ -197,7 +197,7 @@ def calculate_E_welfare(x_prime, cascade_list):
 		for v in S:
 			for i in cascade_list:
 				#will give a 1 if the node is cleared in that cascade, note we DON'T want it in the connected component
-				val = int(all([False if v in cc else True for cc in i]))
+				val = int(False if v in i else True)
 				running_clearances += val
 	return running_clearances / num_cascades #The correct objective value I think?
 
@@ -256,30 +256,35 @@ if __name__ == "__main__":
 
 	done = False
 	#x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=(mini+maxi)/2, epsilon=.1)
-	mini = 1/len(graph) ; maxi = len(graph) ** 2
-	budget = 10 #int(np.log(len(graph.nodes())))
+	mini = 1/len(graph) ** 2; maxi = len(graph) ** 4
+	budget = 3 #int(np.log(len(graph.nodes())))
 
 	it = 0
 
 	while not done:
 		lam = (mini+maxi) / 2
-		x, z, obj_value, variables = LinearProgram(graph, set_list, cascade_list, 3, lam=lam)
+		x, z, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget, lam=lam)
 
-		print(f'Lambda Guess: {lam}, number of sets: {sum([x[key] for key in list(x.keys())])}')
+		print(f'Lambda Guess: {lam}')
+		print(f'X Dict: {x}')
 		done, mini, maxi = binary_search(mini, maxi, x, budget, convex_ep=.2)
 		if it > 5000:
 			print(it)
 			done = True
 		it += 1
-	print(f'Objeective Value: {obj_value}')
-	print(f'Variables: {variables}')
+	
+	expected_welfare = 0
+	for i in z.keys():
+		expected_welfare += 1-z[i]
+	print(f'Expected Welfare: {expected_welfare/len(cascade_list)}')
+	#print(f'Variables: {variables}')
 
 
 	x_prime = rounding(x)
 
 	rounded_obj_val = calculate_E_welfare(x_prime, cascade_list)
 
-	print(f'LP Obj Val: {obj_value}, Rounded Obj Val: {rounded_obj_val}, size of x, y: {len(x)}, {len(y)}')
+	print(f'Expected Welfare: {expected_welfare}, Actual Welfare from Cascades: {rounded_obj_val}, size of x, y: {len(x)}, {len(y)}')
 
 
 
