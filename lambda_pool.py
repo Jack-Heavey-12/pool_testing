@@ -37,7 +37,7 @@ def acceptable_range(budget, sets_output, lam, eta=.05):
 
 def binary_search(mini, maxi, x_dict, budget, convex_ep=.5):
 	val = mini * convex_ep + maxi * (1 - convex_ep) #(mini+maxi) / 2
-	sets_output = sum([x_dict[i].X for i in list(x_dict.keys())])
+	sets_output = sum([x_dict[i] for i in list(x_dict.keys())])
 	bool_val, lam = acceptable_range(budget, sets_output, val)
 	if bool_val == 0:	
 		return True, 0, 0
@@ -159,7 +159,14 @@ def LinearProgram(graph, set_list, cascades, B=3, lam=1.01, overlapping=True):
 	#RETURNS THE DICTIONARY WITH THE VARIABLES X (FOR ROUNDING LATER), DICTIONARY WITH VARIABLES Y, 
 	#		AND THE OPTIMAL OBJECTIVE VALUE (UPPER BOUND ON ROUNDED ANSWER WITH NO VIOLATED BUDGET)
 	variables = m.getVars()
-	return x, z, m.objVal, variables
+	x_vals = {}
+	z_vals = {}
+	for i in x.keys():
+		x_vals[i] = x[i].X
+	for i in z.keys():
+		z_vals[i] = z[i].X
+
+	return x_vals, z_vals, m.objVal, variables
 
 
 def rounding(x_dict):
@@ -258,7 +265,7 @@ if __name__ == "__main__":
 		lam = (mini+maxi) / 2
 		x, z, obj_value, variables = LinearProgram(graph, set_list, cascade_list, 3, lam=lam)
 
-		print(f'Lambda Guess: {lam}, number of sets: {sum([x[key].X for key in list(x.keys())])}')
+		print(f'Lambda Guess: {lam}, number of sets: {sum([x[key] for key in list(x.keys())])}')
 		done, mini, maxi = binary_search(mini, maxi, x, budget, convex_ep=.2)
 		if it > 5000:
 			print(it)
