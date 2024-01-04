@@ -27,26 +27,44 @@ def enumerate(graph, n_p=3):
 	print('Potential Pools Enumerated')
 	return set_list
 
-def acceptable_range(budget, sets_output, lam, eta=.5):
+def enumerate_random(graph, n_p, num_sets=1000):
+	#Returns a shorter list of possible subsets for when graphs are larger
+	#TODO
+	nodes = list(graph.nodes())
+	set_list = []
+	for _ in range(num_sets):
+		set_list.append(tuple(random.sample(nodes, n_p)))
+	return set_list
+
+'''def acceptable_range(budget, sets_output, lam, eta=.05):
 	if np.absolute((np.sum(sets_output) - budget)) < eta: #budget * eta:
 		return 0, lam
 	elif np.sum(sets_output) > budget:
 		return -1, lam
 	else:
 		return 1, lam
+'''
 
-def binary_search(mini, maxi, x_dict, budget, convex_ep=.5):
-	val = mini * convex_ep + maxi * (1 - convex_ep) #(mini+maxi) / 2
-	sets_output = sum([x_dict[i] for i in list(x_dict.keys())])
-	bool_val, lam = acceptable_range(budget, sets_output, val)
-	if bool_val == 0:	
+def binary_search(mini, maxi, x_dict, budget, eta=.25):
+	su = np.sum(list(x_dict.values()))
+	if np.abs((su - budget)/budget) <= .1:
 		return True, 0, 0
-	elif bool_val == -1:
-		#return False, array[:mid_index+1:]
-		return False, val, maxi
+	#if lam - mini <.05:
+	#	return False, lam/2, lam*2
+	if su > budget:
+		return False, lam, maxi
 	else:
-		#return False, array[:mid_index-1]
-		return False, mini, val
+		return False, mini, lam
+
+def best_guess(x, budget, prior_best):
+	su = np.sum(list(x.values())); p_su = np.sum(list(prior_best.values())); 
+	if np.abs(su - budget) < np.abs(p_su - budget):
+		return x
+	else:
+		return prior_best
+
+
+
 
 def cascade_construction(graph, N, p, source_count=1):
 	# Returns the list of connected components to the source.
@@ -103,7 +121,7 @@ def LinearProgram(graph, set_list, cascades, B=3, lam=1.01, overlapping=True):
 	node_list = list(graph.nodes())
 	for i in range(len(cascades)):
 		for v in node_list:
-			z[f'({v}, {i})'] = m.addVar(vtype = GRB.CONTINUOUS, lb = 0.0, ub = 1.0, name = f'z[({v}, {i})]')
+			z[f'(node_{v}, casc_{i})'] = m.addVar(vtype = GRB.CONTINUOUS, lb = 0.0, ub = 1.0, name = f'z[({v}, {i})]')
 
 	m.update()
 
@@ -135,7 +153,7 @@ def LinearProgram(graph, set_list, cascades, B=3, lam=1.01, overlapping=True):
 				if not val:
 					# The node is not in the connected component, any set with this node in it is valid:
 					F_vi = [S for S in set_list if v in S]
-					m.addConstr(quicksum(x[S] for S in F_vi) + z[f'({v}, {i})'] >= 1, name=f'C1_Node_{v}_cascade_{i}')
+					m.addConstr(quicksum(x[S] for S in F_vi) + z[f'(node_{v}, casc_{i})'] >= 1, name=f'C1_Node_{v}_cascade_{i}')
 	#END CONSTRAINT ONE
 
 	m.update()
@@ -153,7 +171,10 @@ def LinearProgram(graph, set_list, cascades, B=3, lam=1.01, overlapping=True):
 			if not val:
 				possible_cleared_nodes.append((v,i))
 
-	m.setObjective(1/N * quicksum(z[f'({v}, {i})'] for (v,i) in possible_cleared_nodes) + lam/N * quicksum(x[S] for S in set_list), GRB.MINIMIZE)
+
+	m.setObjective(1/N * quicksum(z[f'(node_{v}, casc_{i})'] for (v,i) in possible_cleared_nodes) + lam * quicksum(x[S] for S in set_list),
+	 				GRB.MINIMIZE)
+
 	m.setParam('OutputFlag', 1)
 	m.update()
 	m.optimize()
@@ -203,7 +224,7 @@ def calculate_E_welfare(x_prime, cascade_list):
 		for v in S:
 			for i in cascade_list:
 				#will give a 1 if the node is cleared in that cascade, note we DON'T want it in the connected component
-				val = int(False if v in i else True)
+				val = int(False if v in i else True) * x_prime[S] #will multiply by the fractional value.
 				running_clearances += val
 	return running_clearances / num_cascades #The correct objective value I think?
 
@@ -231,7 +252,7 @@ def read_graph(name):
 		for line in lines:
 			lst.append(line.strip())
 		network.close()
-		H_prime = nx.parse_edgelist(lst[:450])
+		H_prime = nx.parse_edgelist(lst[:6000])
 		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
 		del lst
 	elif name == 'uva_post':
@@ -245,6 +266,8 @@ def read_graph(name):
 		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
 	elif name == 'random':
 		G = nx.read_edgelist('data/random_150_0.08_12.txt')
+	elif name == 'path_graph':
+		G = nx.read_edgelist('data/path_graph_4.txt')
 
 	mapping = dict(zip(G.nodes(),range(len(G))))
 	graph = nx.relabel_nodes(G,mapping)
@@ -253,44 +276,71 @@ def read_graph(name):
 if __name__ == "__main__":
 
 	graph = read_graph('test_graph')
+	#graph = read_graph('path_graph')
+
 	
-	set_list = enumerate(graph)
+	set_list = enumerate(graph, n_p=3)
+	#set_list = enumerate_random(graph, n_p=3, num_sets=1000)
 	#cascade_list = cascade_construction(graph, 1000, .05)
 	with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
+	#with open('test_cascades/path_graph_4n_5c.pkl', 'rb') as f:
+	#with open('test_cascades/uva_pre_1000_0.5.pkl', 'rb') as f:
 		cascade_list = pickle.load(f)
 
+	fl = .1
 
 	done = False
 	#x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=(mini+maxi)/2, epsilon=.1)
-	mini = 1/len(graph) ** 2; maxi = len(graph) ** 4
-	budget = 3 #int(np.log(len(graph.nodes())))
-
+	mini = 1/len(graph) ** 2; maxi = (len(cascade_list) * len(graph)) ** 2
+	budget = 5 #int(np.log(len(graph.nodes())))
+	lam = len(graph)
+	convex_ep=.5
 	it = 0
+	prior_best = {}
+
 
 	while not done:
-		lam = (mini+maxi) / 2
+		#lam = (mini+maxi) / 2
 		x, z, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget, lam=lam)
 
 		print(f'Lambda Guess: {lam}')
 		#print(f'X Dict: {x}')
-		done, mini, maxi = binary_search(mini, maxi, x, budget, convex_ep=.2)
+		done, mini, maxi = binary_search(mini, maxi, x, budget, eta=.05)
 		if it > 5000:
 			print(it)
 			done = True
 		it += 1
+		prior_best = best_guess(x, budget, prior_best)
+		lam = mini * convex_ep + (1-convex_ep) * maxi
+		#print(f'Variables: {x}, {z}')
 	
 	expected_welfare = 0
 	for i in z.keys():
 		expected_welfare += 1-z[i]
-	print(f'Expected Welfare: {expected_welfare/len(cascade_list)}')
+	#print(f'Expected Welfare: {expected_welfare/len(cascade_list)}')
+
+	#print(f'\n\nCascades: {[i.nodes() for i in cascade_list]}\n\n')
+
 	#print(f'Variables: {variables}')
 
+	x = prior_best
 
 	x_prime = rounding(x)
+	nonzeros = {}
+	for i in x.keys():
+		if x[i] > 0:
+			nonzeros[i] = x[i]
+	#print(f'\n\nCascades: {[i.nodes() for i in cascade_list]}\n\n')
+	#print(f'LP Output: {nonzeros}, Ys: {y}')
+	print(f'Sets Chosen: {nonzeros}')
 
+	pre_rounded_obj_val = calculate_E_welfare(nonzeros, cascade_list)
 	rounded_obj_val = calculate_E_welfare(x_prime, cascade_list)
 
-	print(f'Expected Welfare: {expected_welfare}, Actual Welfare from Cascades: {rounded_obj_val}, size of x, y: {len(x)}, {len(y)}')
+	with open('lam_results.csv', 'a') as f:
+		f.write(f'\n{len(graph)},{len(cascade_list)},{fl},{pre_rounded_obj_val},{rounded_obj_val}, Y, {len(set_list)}, 3,{budget}')
+
+	print(f'Expected Welfare: {pre_rounded_obj_val}, Actual Welfare from Cascades: {rounded_obj_val}, size of x, y: {len(x)}, {len(z)}')
 
 
 

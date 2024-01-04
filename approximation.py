@@ -158,7 +158,7 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 
 	#define the vectors c and b as defined in the dual program
 	c_vec = np.array([1 if x not in casc else tau for (x, casc) in v_i_list]) #[1] * len(v_i_list))
-	b_vec = np.array([lam/casc_len] * pool_len + [1/casc_len] * v_i_len)
+	b_vec = np.array([lam] * pool_len + [1/casc_len] * v_i_len)
 
 
 	delta = (1 + epsilon) *  ((1+epsilon) * (v_i_len + pool_len)) ** (-1/epsilon)
@@ -201,29 +201,26 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 # Recall 1-y = z -> y = z+1
 
 
-
-	
-def acceptable_range(budget, sets_output, lam, eta=.05):
-	if np.absolute((np.sum(sets_output) - budget)) < budget * eta:
-		return 0, lam
-	elif np.sum(sets_output) > budget:
-		return -1, lam
-	else:
-		return 1, lam
-
-
-def binary_search(mini, maxi, sets_output, budget, convex_ep=.5):
-	val = mini * convex_ep + maxi * (1 - convex_ep) #(mini+maxi) / 2
-	bool_val, lam = acceptable_range(budget, sets_output, val)
-	if bool_val == 0:
-		
+def binary_search(mini, maxi, x_dict, budget, eta=.25):
+	su = np.sum(list(x_dict.values()))
+	if np.abs((su - budget)/budget) <= .1:
 		return True, 0, 0
-	elif bool_val == -1:
-		#return False, array[:mid_index+1:]
-		return False, val, maxi
+	#if lam - mini <.05:
+	#	return False, lam/2, lam*2
+	if su > budget:
+		return False, lam, maxi
 	else:
-		#return False, array[:mid_index-1]
-		return False, mini, val
+		return False, mini, lam
+
+def best_guess(x, budget, prior_best):
+	su = np.sum(list(x.values())); p_su = np.sum(list(prior_best.values())); 
+	if np.abs(su - budget) < np.abs(p_su - budget):
+		return x
+	else:
+		return prior_best
+
+
+
 
 def read_graph(name):
 	if name == 'test_graph':
@@ -272,13 +269,15 @@ if __name__ == "__main__":
 	#So this graph is only 75 nodes, 1138 edges
 	print('Here we go!')
 
-	graph = read_graph('lyon')
+	graph = read_graph('test_graph')
 	
-	set_list = enumerate(graph)
+	set_list = enumerate(graph, n_p=3)
 	#set_list = enumerate_random(graph, 5)
 
-	print(f'Pools enumerated: {time.time() - start_time} seconds ---')
-	cascade_list = cascade_construction(graph, 750, .1)
+	with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
+	#with open('test_cascades/path_graph_4n_5c.pkl', 'rb') as f:
+	#with open('test_cascades/uva_pre_1000_0.5.pkl', 'rb') as f:
+		cascade_list = pickle.load(f)
 
 	# Doing it this way because A only has to be constructed once and is a major time suck
 	# We have to do the approximation a few times to settle on lambda
@@ -287,12 +286,17 @@ if __name__ == "__main__":
 
 	done = False
 	#x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=(mini+maxi)/2, epsilon=.1)
-	mini = 1/len(graph) ; maxi = len(graph) ** 2
+	mini = 1/len(graph) ** 2; maxi = (len(cascade_list) * len(graph)) ** 2
 	budget = 10 #int(np.log(len(graph.nodes())))
+
+	lam = len(graph)
+	convex_ep=.5
+	it = 0
+	prior_best = {}
 
 	it = 0
 
-	while not done:
+	'''while not done:
 		lam = (mini+maxi) / 2
 		x_s, z_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.05)
 		print(f'Lambda Guess: {lam}, number of sets: {sum(x_s)}')
@@ -300,7 +304,23 @@ if __name__ == "__main__":
 		if it > 5000:
 			print(it)
 			done = True
+		it += 1'''
+
+	while not done:
+		#lam = (mini+maxi) / 2
+		x_s, z_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.05)
+		print(f'Lambda Guess: {lam}, number of sets: {sum(x_s)}')
+		done, mini, maxi = binary_search(mini, maxi, x_s, budget, convex_ep=.2)
+		#print(f'X Dict: {x}')
+		if it > 5000:
+			print(it)
+			done = True
 		it += 1
+		prior_best = best_guess(x, budget, prior_best)
+		lam = mini * convex_ep + (1-convex_ep) * maxi
+		#print(f'Variables: {x}, {z}')
+
+
 
 	#x_s, y_i_d = approximation(set_list, list(graph.nodes()), cascade_list, epsilon=.1)
 
@@ -308,7 +328,7 @@ if __name__ == "__main__":
 
 	#rounded_obj_val = calculate_E_welfare(x_prime, cascade_list)
 	# z = 1 - y, which means y = 1-z
-	np.set_printoptions(threshold=sys.maxsize)
+	#np.set_printoptions(threshold=sys.maxsize)
 	#print(f'Any OOB? {not all((z_i_d > 0) & (z_i_d < 1))}')
 	print(f'Maximum Value: {max(z_i_d)}')
 	#print(f'Array: {z_i_d}')

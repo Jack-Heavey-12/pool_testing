@@ -66,7 +66,7 @@ def read_graph(name):
 		for line in lines:
 			lst.append(line.strip())
 		network.close()
-		H_prime = nx.parse_edgelist(lst[:450])
+		H_prime = nx.parse_edgelist(lst[:250])
 		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
 		del lst
 	elif name == 'uva_post':
@@ -87,9 +87,9 @@ def read_graph(name):
 
 if __name__ == "__main__":
 
-	graph = read_graph('test_graph')
+	graph = read_graph('uva_pre')
 	
-	cascade_list = cascade_construction(graph, 100, .1)
+	cascade_list = cascade_construction(graph, 500, .1)
 
-	with open('test_cascades/test_graph_100_0.1.pkl', 'wb') as f:
+	with open('test_cascades/uva_pre_500_0.2.pkl', 'wb') as f:
 		pickle.dump(cascade_list, f)

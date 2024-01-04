@@ -27,15 +27,6 @@ def enumerate(graph, n_p=3):
 	print('Potential Pools Enumerated')
 	return set_list
 
-def enumerate_random(graph, n_p, num_sets=1000):
-	#Returns a shorter list of possible subsets for when graphs are larger
-	#TODO
-	nodes = list(graph.nodes())
-	set_list = []
-	for _ in range(num_sets):
-		set_list.append(tuple(random.sample(nodes, n_p)))
-	return set_list
-
 
 def cascade_construction(graph, N, p, source_count=1):
 	# Returns the list of connected components to the source.
@@ -80,7 +71,7 @@ def cascade_construction(graph, N, p, source_count=1):
 def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 
 	x = {} # defined in the paper
-	y = {} # defined in the paper
+	z = {} # defined in the paper
 
 	N = len(cascades)
 
@@ -92,7 +83,7 @@ def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 	node_list = list(graph.nodes())
 	for i in range(len(cascades)):
 		for v in node_list:
-			y[f'(node_{v}, casc_{i})'] = m.addVar(vtype = GRB.CONTINUOUS, lb = 0.0, ub = 1.0, name = f'y[({v}, {i})]')
+			z[f'(node_{v}, casc_{i})'] = m.addVar(vtype = GRB.CONTINUOUS, lb = 0.0, ub = 1.0, name = f'z[({v}, {i})]')
 
 	m.update()
 
@@ -124,7 +115,7 @@ def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 				if not val:
 					# The node is not in the connected component, any set with this node in it is valid:
 					F_vi = [S for S in set_list if v in S]
-					m.addConstr(y[f'(node_{v}, casc_{i})'] <= quicksum(x[S] for S in F_vi), name=f'C1_Node_{v}_cascade_{i}')
+					m.addConstr(quicksum(x[S] for S in F_vi) + z[f'(node_{v}, casc_{i})'] >= 1, name=f'C1_Node_{v}_cascade_{i}')
 	#END CONSTRAINT ONE
 
 	m.update()
@@ -142,7 +133,7 @@ def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 			if not val:
 				possible_cleared_nodes.append((v,i))
 
-	m.setObjective(1/N * quicksum(y[f'(node_{v}, casc_{i})'] for (v,i) in possible_cleared_nodes), GRB.MAXIMIZE)
+	m.setObjective(1/N * quicksum(z[f'(node_{v}, casc_{i})'] for (v,i) in possible_cleared_nodes), GRB.MINIMIZE)
 	m.setParam('OutputFlag', 1)
 	m.update()
 	m.optimize()
@@ -150,17 +141,17 @@ def LinearProgram(graph, set_list, cascades, B=3, overlapping=True):
 
 	print(f'Solution Count: {m.SolCount}')
 	x_vals = {}
-	y_vals = {}
+	z_vals = {}
 	for i in x.keys():
 		x_vals[i] = x[i].X
-	for i in y.keys():
-		y_vals[i] = y[i].X
+	for i in z.keys():
+		z_vals[i] = z[i].X
 
 
 	#RETURNS THE DICTIONARY WITH THE VARIABLES X (FOR ROUNDING LATER), DICTIONARY WITH VARIABLES Y, 
 	#		AND THE OPTIMAL OBJECTIVE VALUE (UPPER BOUND ON ROUNDED ANSWER WITH NO VIOLATED BUDGET)
 	variables = m.getVars()
-	return x_vals, y_vals, m.objVal, variables
+	return x_vals, z_vals, m.objVal, variables
 
 
 def rounding(x_dict):
@@ -219,8 +210,7 @@ def read_graph(name):
 		for line in lines:
 			lst.append(line.strip())
 		network.close()
-		H_prime = nx.parse_edgelist(lst[:6000])
-		# 6000 edges is 3080 nodes
+		H_prime = nx.parse_edgelist(lst[:450])
 		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
 		del lst
 	elif name == 'uva_post':
@@ -244,25 +234,24 @@ def read_graph(name):
 
 if __name__ == "__main__":
 
-	graph = read_graph('uva_pre')
+	graph = read_graph('test_graph')
 	#graph = read_graph('path_graph')
 	
-	#set_list = enumerate(graph, n_p=3)
-	set_list = enumerate_random(graph, n_p=3)
+	set_list = enumerate(graph, n_p=2)
 	#cascade_list = cascade_construction(graph, 1000, .05)
 
-	if len(sys.argv) >= 2:
-		budget = int(sys.argv[1])
-	else:
-		budget = 19
+	budget = 5
 
-	#with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
-	fl = .5
-	with open('test_cascades/uva_pre_1000_0.5.pkl', 'rb') as f:
+	with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
+	#with open('test_cascades/path_graph_4n_5c.pkl', 'rb') as f:
 		cascade_list = pickle.load(f)
 
-	x, y, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget)
-	#print(f'Objeective Value: {obj_value}')
+	x, z, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget)
+	print(f'Objeective Value: {obj_value}')
+	y = {}
+	for i in z.keys():
+		y[i] = 1 - z[i]
+
 	#print(f'Variables: {x}, {y}')
 
 
@@ -278,9 +267,7 @@ if __name__ == "__main__":
 
 	rounded_obj_val = calculate_E_welfare(x_prime, cascade_list)
 
-	#print(f'LP Obj Val: {obj_value}, Rounded Obj Val: {rounded_obj_val}, size of x, y: {len(x)}, {len(y)}')
-	with open('results_file.csv', 'a') as f:
-		f.write(f'\n{len(graph)},{len(cascade_list)},{fl},{obj_value},{rounded_obj_val}, Y, {len(set_list)}, 3,{budget}')
+	print(f'LP Obj Val: {obj_value}, Rounded Obj Val: {rounded_obj_val}, size of x, y: {len(x)}, {len(y)}')
 
 
 
