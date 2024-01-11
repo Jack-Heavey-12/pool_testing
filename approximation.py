@@ -142,13 +142,6 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 	# 1) Define delta, epsilon - DONE
 	# 2) Figure out iterating for lambda, should that happen outside of the approximation function?
 	# 3) Define stopping condition (think this is correct, while loop below)
-	
-	# setup the binary search subroutine here
-	lam_array = list(range(1, len(nodes) ** 2 + 1))
-	mid_index = len(lam_array) // 2
-	initial_lam = lam_array[mid_index]
-	down = lam_array[:mid_index-1]
-	up = lam_array[mid_index+1:]
 
 	v_i_list = list(itertools.product(nodes, cascades))
 	
@@ -202,7 +195,7 @@ def approximation(A, pools, nodes, cascades, lam=1.01, epsilon=.01, tau=1e-10):
 
 
 def binary_search(mini, maxi, x_dict, budget, eta=.25):
-	su = np.sum(list(x_dict.values()))
+	su = np.sum(x_dict)
 	if np.abs((su - budget)/budget) <= .1:
 		return True, 0, 0
 	#if lam - mini <.05:
@@ -213,7 +206,7 @@ def binary_search(mini, maxi, x_dict, budget, eta=.25):
 		return False, mini, lam
 
 def best_guess(x, budget, prior_best):
-	su = np.sum(list(x.values())); p_su = np.sum(list(prior_best.values())); 
+	su = np.sum(x); p_su = np.sum(prior_best); 
 	if np.abs(su - budget) < np.abs(p_su - budget):
 		return x
 	else:
@@ -244,7 +237,7 @@ def read_graph(name):
 		for line in lines:
 			lst.append(line.strip())
 		network.close()
-		H_prime = nx.parse_edgelist(lst[:450])
+		H_prime = nx.parse_edgelist(lst[:6000])
 		G = H_prime.subgraph(max(nx.connected_components(H_prime))).copy()
 		del lst
 	elif name == 'uva_post':
@@ -292,7 +285,7 @@ if __name__ == "__main__":
 	lam = len(graph)
 	convex_ep=.5
 	it = 0
-	prior_best = {}
+	prior_best = []
 
 	it = 0
 
@@ -310,13 +303,13 @@ if __name__ == "__main__":
 		#lam = (mini+maxi) / 2
 		x_s, z_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.05)
 		print(f'Lambda Guess: {lam}, number of sets: {sum(x_s)}')
-		done, mini, maxi = binary_search(mini, maxi, x_s, budget, convex_ep=.2)
+		done, mini, maxi = binary_search(mini, maxi, x_s, budget)
 		#print(f'X Dict: {x}')
 		if it > 5000:
 			print(it)
 			done = True
 		it += 1
-		prior_best = best_guess(x, budget, prior_best)
+		prior_best = best_guess(x_s, budget, prior_best)
 		lam = mini * convex_ep + (1-convex_ep) * maxi
 		#print(f'Variables: {x}, {z}')
 

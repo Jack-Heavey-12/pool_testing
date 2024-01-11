@@ -247,18 +247,23 @@ if __name__ == "__main__":
 	graph = read_graph('uva_pre')
 	#graph = read_graph('path_graph')
 	
+	if len(sys.argv) >= 2:
+		num_sets = int(sys.argv[1])
+	else:
+		num_sets = 1000
+
+	n_p = 4
+	budget = 10
+
 	#set_list = enumerate(graph, n_p=3)
-	set_list = enumerate_random(graph, n_p=3)
+	set_list = enumerate_random(graph, n_p=n_p, num_sets=num_sets)
 	#cascade_list = cascade_construction(graph, 1000, .05)
 
-	if len(sys.argv) >= 2:
-		budget = int(sys.argv[1])
-	else:
-		budget = 19
+	
 
 	#with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
-	fl = .5
-	with open('test_cascades/uva_pre_1000_0.5.pkl', 'rb') as f:
+	fl = .33
+	with open('test_cascades/uva_pre_1000_0.33.pkl', 'rb') as f:
 		cascade_list = pickle.load(f)
 
 	x, y, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget)
@@ -280,7 +285,7 @@ if __name__ == "__main__":
 
 	#print(f'LP Obj Val: {obj_value}, Rounded Obj Val: {rounded_obj_val}, size of x, y: {len(x)}, {len(y)}')
 	with open('results_file.csv', 'a') as f:
-		f.write(f'\n{len(graph)},{len(cascade_list)},{fl},{obj_value},{rounded_obj_val}, Y, {len(set_list)}, 3,{budget}')
+		f.write(f'\n{len(graph)},{len(cascade_list)},{fl},{obj_value},{rounded_obj_val}, Y, {len(set_list)}, {n_p},{budget}')
 
 
 
