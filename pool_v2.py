@@ -254,7 +254,7 @@ if __name__ == "__main__":
 		num_sets = 1000
 
 	n_p = 4
-	budget = 500
+	budget = 100
 
 	#set_list = enumerate(graph, n_p=3)
 	set_list = enumerate_random(graph, n_p=n_p, num_sets=num_sets)
