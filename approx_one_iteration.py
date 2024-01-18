@@ -282,7 +282,7 @@ if __name__ == "__main__":
 	mini = 1/len(graph) ** 2; maxi = (len(cascade_list) * len(graph)) ** 2
 	budget = 5 #int(np.log(len(graph.nodes())))
 
-	lam = len(graph)
+	lam = 2.00341796875
 	convex_ep=.5
 	it = 0
 	prior_best = []
@@ -299,19 +299,9 @@ if __name__ == "__main__":
 			done = True
 		it += 1'''
 
-	while not done:
-		#lam = (mini+maxi) / 2
-		x_s, z_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.05)
-		print(f'Lambda Guess: {lam}, number of sets: {sum(x_s)}')
-		done, mini, maxi = binary_search(mini, maxi, x_s, budget)
-		#print(f'X Dict: {x}')
-		if it > 5000:
-			print(it)
-			done = True
-		it += 1
-		prior_best = best_guess(x_s, budget, prior_best)
-		lam = mini * convex_ep + (1-convex_ep) * maxi
-		#print(f'Variables: {x}, {z}')
+
+	x_s, z_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=lam, epsilon=.05)
+	print(f'Lambda Guess: {lam}, number of sets: {sum(x_s)}')
 
 
 

@@ -253,7 +253,7 @@ if __name__ == "__main__":
 		num_sets = 1000
 
 	n_p = 4
-	budget = 10
+	budget = 500
 
 	#set_list = enumerate(graph, n_p=3)
 	set_list = enumerate_random(graph, n_p=n_p, num_sets=num_sets)
@@ -266,7 +266,7 @@ if __name__ == "__main__":
 	with open('test_cascades/uva_pre_1000_0.33.pkl', 'rb') as f:
 		cascade_list = pickle.load(f)
 
-	x, y, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget)
+	x, y, obj_value, variables = LinearProgram(graph, set_list, cascade_list, B=budget)
 	#print(f'Objeective Value: {obj_value}')
 	#print(f'Variables: {x}, {y}')
 

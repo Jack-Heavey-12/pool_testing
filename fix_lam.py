@@ -280,11 +280,11 @@ if __name__ == "__main__":
 
 	
 	set_list = enumerate(graph, n_p=3)
-	#set_list = enumerate_random(graph, n_p=4, num_sets=5000)
+	#set_list = enumerate_random(graph, n_p=3, num_sets=1000)
 	#cascade_list = cascade_construction(graph, 1000, .05)
 	with open('test_cascades/test_graph_100_0.1.pkl', 'rb') as f:
 	#with open('test_cascades/path_graph_4n_5c.pkl', 'rb') as f:
-	#with open('test_cascades/uva_pre_1000_0.33.pkl', 'rb') as f:
+	#with open('test_cascades/uva_pre_1000_0.5.pkl', 'rb') as f:
 		cascade_list = pickle.load(f)
 
 	fl = .1
@@ -293,27 +293,15 @@ if __name__ == "__main__":
 	#x_s, y_i_d = approximation(A, set_list, list(graph.nodes()), cascade_list, lam=(mini+maxi)/2, epsilon=.1)
 	mini = 1/len(graph) ** 2; maxi = (len(cascade_list) * len(graph)) ** 2
 	budget = 5 #int(np.log(len(graph.nodes())))
-	lam = len(graph)
+	lam = 2.00341796875
 	convex_ep=.5
 	it = 0
 	prior_best = {}
 
 
-	while not done:
-		#lam = (mini+maxi) / 2
-		x, z, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget, lam=lam)
 
-		print(f'Lambda Guess: {lam}')
-		#print(f'X Dict: {x}')
-		done, mini, maxi = binary_search(mini, maxi, x, budget, eta=.05)
-		if it > 5000:
-			print(it)
-			done = True
-		it += 1
-		prior_best = best_guess(x, budget, prior_best)
-		lam = mini * convex_ep + (1-convex_ep) * maxi
-		#print(f'Variables: {x}, {z}')
-	
+	x, z, obj_value, variables = LinearProgram(graph, set_list, cascade_list, budget, lam=lam)
+
 	expected_welfare = 0
 	for i in z.keys():
 		expected_welfare += 1-z[i]
@@ -332,7 +320,7 @@ if __name__ == "__main__":
 			nonzeros[i] = x[i]
 	#print(f'\n\nCascades: {[i.nodes() for i in cascade_list]}\n\n')
 	#print(f'LP Output: {nonzeros}, Ys: {y}')
-	print(f'Sets Chosen: {nonzeros}')
+	print(f'Sets Chosen: {nonzeros}, number of sets: {len(nonzeros)}')
 
 	pre_rounded_obj_val = calculate_E_welfare(nonzeros, cascade_list)
 	rounded_obj_val = calculate_E_welfare(x_prime, cascade_list)
