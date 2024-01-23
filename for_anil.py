@@ -182,6 +182,19 @@ def rounding(x_dict):
 	#NOTE2:	The keys in x, and thus x_prime_dict, are the sets themselves. Think that's the best way to do it, shouldn't have any assignment issues?
 	return x_prime_dict
 
+def calculate_rounded_welfare(x_prime, cascade_list):
+	#TODO
+	num_cascades = len(cascade_list)
+	running_clearances = 0
+	for S in x_prime.keys():
+		#x_prime.keys() is going to be a set, which means have to iterate through the set and then each cascade to see if it's cleared.
+		for v in S:
+			for i in cascade_list:
+				#will give a 1 if the node is cleared in that cascade, note we DON'T want it in the connected component
+				val = int(not (v in i))
+				running_clearances += val
+	return running_clearances / num_cascades
+
 
 def calculate_E_welfare(x_prime, cascade_list):
 	#TODO
@@ -283,11 +296,11 @@ if __name__ == "__main__":
 	print(f'Sets Chosen: {nonzeros}')
 
 
-	#rounded_obj_val = calculate_E_welfare(x_prime, cascade_list)
+	rounded_obj_val = calculate_rounded_welfare(x_prime, cascade_list)
 
 	#print(f'LP Obj Val: {obj_value}, Rounded Obj Val: {rounded_obj_val}, size of x, y: {len(x)}, {len(y)}')
 	with open('anil_results.csv', 'a') as f:
-		f.write(f'\n{len(graph)},{len(cascade_list)},{fl},{obj_value}, Y, {len(set_list)}, {n_p},{budget}, LP')
+		f.write(f'\n{len(graph)},{len(cascade_list)},{fl},{rounded_obj_val}, Y, {len(set_list)}, {n_p},{budget}, LP')
 
 	random_sets = enumerate_random(graph, n_p=n_p, num_sets=budget)
 	random_clearances = calculate_E_welfare(random_sets, cascade_list)
