@@ -31,7 +31,7 @@ def define_a_matrix(pools, nodes, cascades, tau=1e-10):
 
 	for i in range(pool_len):
 		# This is taking into account note 2 for Anil, where it is checking to see if any of the values in the set fall in the cascade (which is when it would result in a negative test)
-		A[i + v_i_len] = np.array([1 if ((x in pools[i]) and any(x in pools[i] for x in casc)) else tau for (x, casc) in v_i_list])
+		A[i + v_i_len] = np.array([1 if ((x in pools[i]) and not any(x in casc for x in pools[i])) else tau for (x, casc) in v_i_list])
 		#A[i, :] = np.array([1 if (x in pools[i]) else tau for (x, casc) in v_i_list])
 
 	A_vid = np.identity(v_i_len)
